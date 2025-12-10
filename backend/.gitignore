@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+
+# FFmpeg (local binary)
+ffmpeg.exe
+ffmpeg.zip
+ffmpeg_temp/
+
+# Node/Frontend
+node_modules/
+dist/
+.DS_Store

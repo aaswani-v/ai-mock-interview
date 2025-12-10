@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+openai-whisper
+opencv-python
+numpy
+# torch is usually installed by openai-whisper, but including it can be helpful for some envs. 
+# However, standard pip install openai-whisper handles it.
+google-generativeai
+python-dotenv
+groq
