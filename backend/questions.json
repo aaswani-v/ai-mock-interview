@@ -1,0 +1,34 @@
+{
+  "sde1_q1": {
+    "role": "SDE1",
+    "question": "Tell me about a time you debugged a complex issue in production. What was your approach?"
+  },
+  "sde1_q2": {
+    "role": "SDE1",
+    "question": "Explain how you would design a URL shortener service like bit.ly. What are the key components?"
+  },
+  "sde1_q3": {
+    "role": "SDE1",
+    "question": "Describe a situation where you had to optimize the performance of an application. What metrics did you focus on?"
+  },
+  "frontend_q1": {
+    "role": "Frontend",
+    "question": "How do you optimize React component rendering performance? Explain with specific techniques."
+  },
+  "frontend_q2": {
+    "role": "Frontend",
+    "question": "Walk me through how you would implement responsive design for a complex dashboard. What tools and approaches would you use?"
+  },
+  "backend_q1": {
+    "role": "Backend",
+    "question": "Explain the difference between SQL and NoSQL databases. When would you choose one over the other?"
+  },
+  "backend_q2": {
+    "role": "Backend",
+    "question": "How would you design a rate limiting system for an API? What algorithms would you consider?"
+  },
+  "general_q1": {
+    "role": "General",
+    "question": "Tell me about a challenging project you worked on. What made it challenging and how did you overcome the obstacles?"
+  }
+}

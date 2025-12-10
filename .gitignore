@@ -33,3 +33,14 @@ test_output/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Exclude specific folders
+ats_resume/
+test-frontend/
+frontend-test/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

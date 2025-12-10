@@ -1,11 +1,11 @@
-fastapi
-uvicorn
-python-multipart
-openai-whisper
-opencv-python
-numpy
-# torch is usually installed by openai-whisper, but including it can be helpful for some envs. 
-# However, standard pip install openai-whisper handles it.
-google-generativeai
-python-dotenv
-groq
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+opencv-python==4.9.0.80
+numpy==1.26.3
+python-dotenv==1.0.0
+requests==2.31.0
+slowapi==0.1.9
+pydantic==2.5.3
+groq==0.4.1
+deepgram-sdk==3.2.0

@@ -3,62 +3,74 @@ import shutil
 import subprocess
 import tempfile
 import logging
+import json
 from typing import Optional
 from pathlib import Path
-import math
 
 import cv2
-import whisper
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from dotenv import load_dotenv
 
-
-# Trigger reload - Env Updated
+# Load environment variables
+load_dotenv(encoding="utf-8")
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv
-load_dotenv(encoding="utf-8")
+# Import API clients
+from groq_deepgram_client import (
+    transcribe_audio_deepgram,
+    evaluate_answer_groq,
+    test_groq_connection,
+    test_deepgram_connection
+)
+
+# Load questions database
+QUESTIONS = {}
+questions_path = Path(__file__).parent / "questions.json"
+if questions_path.exists():
+    with open(questions_path, "r") as f:
+        QUESTIONS = json.load(f)
+    logger.info(f"Loaded {len(QUESTIONS)} questions from questions.json")
+else:
+    logger.warning("questions.json not found. Question context will be limited.")
+
+# Configuration from environment
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "40"))
+MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "45"))
+RATE_LIMIT = os.getenv("RATE_LIMIT_PER_MINUTE", "10/minute")
 
 # Ensure built-in ffmpeg is found if present
 if os.path.exists("ffmpeg.exe"):
     logger.info("Found local ffmpeg.exe, adding to PATH.")
     os.environ["PATH"] += os.pathsep + os.getcwd()
 
-# Global variable for the Whisper model
-model = None
+# Initialize FastAPI app
+app = FastAPI(
+    title="AI Interview Practice Backend",
+    description="Production-ready backend using Hugging Face Inference API",
+    version="2.0.0"
+)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Life span events for the application.
-    Load the Whisper model on startup.
-    """
-    global model
-    try:
-        logger.info("Loading Whisper model (base)... This might take a moment.")
-        # 'base' is a good balance for speed and accuracy for local testing.
-        model = whisper.load_model("base")
-        logger.info("Whisper model loaded successfully.")
-    except Exception as e:
-        logger.error(f"Failed to load Whisper model: {e}")
-        raise e
-    yield
-    # Cleanup if necessary (nothing specific for now)
+# Setup rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app = FastAPI(title="AI Interview Practice Backend", lifespan=lifespan)
+# CORS Setup - support environment-based origins
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
-# CORS Setup
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+logger.info(f"CORS allowed origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,6 +79,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 def get_video_metadata(video_path: str):
     """
@@ -92,12 +105,12 @@ def get_video_metadata(video_path: str):
         "durationSeconds": duration
     }, None
 
+
 def extract_audio(video_path: str, audio_output_path: str):
     """
     Use ffmpeg to extract audio from video.
     Target: 16kHz mono WAV (ideal for Whisper).
     """
-    # ffmpeg -i input -vn -acodec pcm_s16le -ar 16000 -ac 1 output
     command = [
         "ffmpeg",
         "-i", video_path,
@@ -110,7 +123,6 @@ def extract_audio(video_path: str, audio_output_path: str):
     ]
     
     try:
-        # Run ffmpeg, suppress output unless error
         subprocess.run(
             command, 
             check=True, 
@@ -120,6 +132,7 @@ def extract_audio(video_path: str, audio_output_path: str):
     except subprocess.CalledProcessError as e:
         logger.error(f"FFmpeg error: {e.stderr.decode()}")
         raise RuntimeError("Failed to extract audio from video.")
+
 
 def analyze_transcript(text: str, duration_seconds: float):
     """
@@ -148,7 +161,6 @@ def analyze_transcript(text: str, duration_seconds: float):
     # Normalize and check
     processed_text = text.lower()
     for filler in fillers:
-        # A simple count is used here. For "you know", we count occurrences of the phrase.
         filler_count += processed_text.count(filler)
         
     return {
@@ -157,21 +169,56 @@ def analyze_transcript(text: str, duration_seconds: float):
         "fillerCount": filler_count
     }
 
+
 @app.get("/api/health")
 def health_check():
-    from llm_analysis import test_api_connection
-    api_ok, message = test_api_connection()
+    """
+    Health check endpoint with API status.
+    """
+    groq_ok, groq_message = test_groq_connection()
+    deepgram_ok, deepgram_message = test_deepgram_connection()
+    
     return {
         "status": "ok",
-        "gemini_api": {"status": "up" if api_ok else "down", "message": message}
+        "groq_api": {
+            "status": "up" if groq_ok else "down",
+            "message": groq_message
+        },
+        "deepgram_api": {
+            "status": "up" if deepgram_ok else "down",
+            "message": deepgram_message
+        },
+        "config": {
+            "max_upload_mb": MAX_UPLOAD_MB,
+            "max_duration_seconds": MAX_DURATION_SECONDS,
+            "rate_limit": RATE_LIMIT
+        }
     }
 
+
 @app.post("/api/analyze")
-def analyze_video(
+@limiter.limit(RATE_LIMIT)
+async def analyze_video(
+    request: Request,
     file: UploadFile = File(...),
     role: Optional[str] = Form(None),
-    question_id: Optional[str] = Form(None, alias="questionId") # Support camelCase from frontend if sent that way
+    question_id: Optional[str] = Form(None, alias="questionId"),
+    question: Optional[str] = Form(None)  # Allow direct question text as fallback
 ):
+    """
+    Analyze uploaded interview video using HF Inference API.
+    
+    Args:
+        file: Video file (mp4, webm, etc.)
+        role: Job role (e.g., "SDE1", "Frontend")
+        question_id: Question identifier from questions.json
+        question: Direct question text (fallback if questionId not found)
+        
+    Returns:
+        JSON with transcript, evaluation, and analysis metrics
+    """
+    logger.info(f"Processing video: role={role}, questionId={question_id}, filename={file.filename}")
+    
     # Create a temporary directory for processing
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
@@ -180,42 +227,82 @@ def analyze_video(
             audio_path = temp_path / "extracted_audio.wav"
 
             # 1. Save Uploaded File
-            with open(video_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            file_content = await file.read()
+            file_size_mb = len(file_content) / (1024 * 1024)
             
-            logger.info(f"File saved to {video_path}")
+            # Validate file size
+            if file_size_mb > MAX_UPLOAD_MB:
+                logger.warning(f"File too large: {file_size_mb:.2f}MB > {MAX_UPLOAD_MB}MB")
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File too large. Maximum size is {MAX_UPLOAD_MB}MB, received {file_size_mb:.2f}MB"
+                )
+            
+            with open(video_path, "wb") as buffer:
+                buffer.write(file_content)
+            
+            logger.info(f"File saved: {file_size_mb:.2f}MB")
 
             # 2. Extract Video Metadata (OpenCV)
             video_stats, error = get_video_metadata(str(video_path))
             if error:
                 return JSONResponse(status_code=400, content={"error": error})
+            
+            # Validate duration
+            duration = video_stats["durationSeconds"]
+            if duration > MAX_DURATION_SECONDS:
+                logger.warning(f"Video too long: {duration:.1f}s > {MAX_DURATION_SECONDS}s")
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Video too long. Maximum duration is {MAX_DURATION_SECONDS}s, received {duration:.1f}s"
+                )
+            
+            logger.info(f"Video metadata: {duration:.1f}s, {video_stats['fps']:.1f}fps")
 
             # 3. Extract Audio (FFmpeg)
             extract_audio(str(video_path), str(audio_path))
 
-            # 4. Transcribe (Whisper)
-            if model is None:
-                raise HTTPException(status_code=500, detail="Model not loaded.")
+            # 4. Transcribe using Deepgram API
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
             
-            result = model.transcribe(str(audio_path), fp16=False)
-            transcript_text = result.get("text", "").strip()
+            logger.info(f"Calling Deepgram transcription API ({len(audio_bytes)} bytes)")
+            transcription_result = transcribe_audio_deepgram(audio_bytes)
+            transcript_text = transcription_result.get("text", "").strip()
+            transcription_error = transcription_result.get("error")
+            
+            if transcription_error:
+                logger.error(f"Transcription error: {transcription_error}")
+            else:
+                logger.info(f"Transcription successful: {len(transcript_text)} characters")
 
             # 5. Analyze Text Stats
-            speech_stats = analyze_transcript(transcript_text, video_stats["durationSeconds"])
+            speech_stats = analyze_transcript(transcript_text, duration)
 
-            # 6. Advanced Analyses (New Features)
-            # Visual Analysis
+            # 6. Visual Analysis (unchanged - runs locally)
             from video_analysis import VideoAnalyzer
             video_analyzer = VideoAnalyzer()
             visual_stats = video_analyzer.process_video(str(video_path))
             
-            # Content Analysis (LLM)
-            from llm_analysis import analyze_content_with_llm
-            content_stats = analyze_content_with_llm(transcript_text, question_id)
+            logger.info(f"Visual analysis: eyeContact={visual_stats['eyeContact']}, posture={visual_stats['posture']}")
 
-            # 7. Calculate Overall Score
+            # 7. Content Analysis using Groq LLM
+            # Get question text from database or use provided question
+            question_data = QUESTIONS.get(question_id, {})
+            question_text = question_data.get("question") or question or "General interview question"
+            
+            logger.info(f"Calling Groq evaluation API for question: {question_text[:50]}...")
+            evaluation_result = evaluate_answer_groq(question_text, transcript_text, role or "General")
+            
+            evaluation_error = evaluation_result.get("error")
+            if evaluation_error:
+                logger.error(f"Evaluation error: {evaluation_error}")
+            else:
+                logger.info(f"Evaluation successful: score={evaluation_result.get('score')}")
+
+            # 8. Calculate Overall Score
             # Weights: Content (50%), Visual (30%), Speech (20%)
-            content_score = content_stats.get("score", 0)
+            content_score = evaluation_result.get("score", 5) * 10  # Convert 1-10 to 0-100
             
             # Visual score is avg of eye contact and posture
             visual_score = (visual_stats["eyeContact"] + visual_stats["posture"]) / 2
@@ -223,7 +310,7 @@ def analyze_video(
             # Speech score heuristic: 100 - fillers*5 - WPM deviation penalty
             target_wpm = 130
             wpm = speech_stats["wordsPerMinute"]
-            wpm_penalty = min(50, abs(wpm - target_wpm) * 0.5)
+            wpm_penalty = min(50, abs(wpm - target_wpm) * 0.5) if wpm > 0 else 50
             filler_penalty = min(30, speech_stats["fillerCount"] * 5)
             speech_score = max(0, 100 - wpm_penalty - filler_penalty)
             
@@ -233,19 +320,31 @@ def analyze_video(
                 (speech_score * 0.2)
             )
 
-            return {
+            # 9. Build response
+            response_data = {
                 "role": role,
                 "questionId": question_id,
                 "transcript": transcript_text,
-                "transcriptionError": None,
+                "transcriptionError": transcription_error,
                 "video": video_stats,
                 "speech": speech_stats,
                 "visual": visual_stats,
-                "content": content_stats,
+                "evaluation": {
+                    "score": evaluation_result.get("score", 0),
+                    "reasoning": evaluation_result.get("reasoning", ""),
+                    "suggestions": evaluation_result.get("suggestions", [])
+                } if not evaluation_error else None,
+                "evaluationError": evaluation_error,
                 "overallScore": overall_score,
                 "speechScore": round(speech_score, 1)
             }
+            
+            logger.info(f"Analysis complete: overallScore={overall_score}")
+            return response_data
 
+        except HTTPException:
+            raise
+        
         except Exception as e:
             logger.exception("Error processing video")
             return JSONResponse(
@@ -259,9 +358,8 @@ def analyze_video(
                 }
             )
 
+
 # Instructions for running
 if __name__ == "__main__":
-    # This block allows running the script directly with python main.py
-    # But usually it's run via uvicorn
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

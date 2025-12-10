@@ -14,9 +14,13 @@ def check_structure():
 
     print(f"API Key found: {api_key[:5]}... (masked)")
     
+
+
+
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Using gemini-2.0-flash
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         print("Sending basic prompt: 'Hello, are you working?'")
         response = model.generate_content("Hello, are you working?")

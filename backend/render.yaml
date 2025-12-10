@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ai-interview-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 120"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: HUGGINGFACE_API_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:3000,http://localhost:5173
+      - key: MAX_UPLOAD_MB
+        value: 40
+      - key: MAX_DURATION_SECONDS
+        value: 45
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 10/minute
