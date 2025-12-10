@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 
-# Trigger reload - Dependency installed
+# Trigger reload - Env Updated
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -159,7 +159,12 @@ def analyze_transcript(text: str, duration_seconds: float):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok"}
+    from llm_analysis import test_api_connection
+    api_ok, message = test_api_connection()
+    return {
+        "status": "ok",
+        "gemini_api": {"status": "up" if api_ok else "down", "message": message}
+    }
 
 @app.post("/api/analyze")
 def analyze_video(

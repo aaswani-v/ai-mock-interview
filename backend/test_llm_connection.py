@@ -21,16 +21,16 @@ if api_key:
         models = list(genai.list_models())
         found = False
         for m in models:
-            if 'gemini-2.0-flash' in m.name:
+            if 'gemini-1.5-flash' in m.name:
                 print(f"Found model: {m.name}")
                 found = True
         
         if not found:
-            print("WARNING: gemini-2.0-flash not found in list_models()")
+            print("WARNING: gemini-1.5-flash not found in list_models()")
 
         # Test 2: Generate content
         print("\nTesting Generation...")
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content("Hello, can you hear me?")
         print(f"Response: {response.text}")
 
