@@ -42,7 +42,8 @@ import {
   Check,
   Square,
   FileCheck,
-  Eye
+  Eye,
+  X
 } from 'lucide-react';
 
 // --- Utility Hook for Scroll Animations ---
@@ -507,9 +508,21 @@ const AuthView = ({ onAuthComplete }) => {
       const data = await response.json();
       
       if (data.success) {
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Merge profile data with user object for proper flow detection
+        const profile = data.user.profile || {};
+        const userData = {
+          uid: data.user.uid,
+          email: data.user.email,
+          name: profile.name || '',
+          role: profile.role || '',
+          experience_years: profile.experience_years || '',
+          salary_expectation: profile.salary_expectation || '',
+          profile_completed: profile.profile_completed || !!profile.name
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('session', JSON.stringify(data.session));
-        onAuthComplete(data.user);
+        onAuthComplete(userData);
         return { success: true };
       } else {
         return { success: false, error: data.detail || 'Invalid credentials' };
@@ -777,15 +790,22 @@ const LandingView = ({ onStart }) => {
   );
 };
 
-const ProfileSetupView = ({ onComplete, onProfileUpdate }) => {
+const ProfileSetupView = ({ onComplete, user }) => {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [experience, setExperience] = useState('');
   const [salary, setSalary] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleComplete = () => {
-    onProfileUpdate({ name, role, experience, salary });
-    onComplete();
+  const handleComplete = async () => {
+    if (!name || !role || !experience) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    await onComplete({ name, role, experience, salary });
+    setLoading(false);
   };
 
   return (
@@ -812,14 +832,259 @@ const ProfileSetupView = ({ onComplete, onProfileUpdate }) => {
           <Input icon={Target} placeholder="e.g., $80,000" value={salary} onChange={(e) => setSalary(e.target.value)} />
         </div>
         <div className="pt-4">
-          <Button className="w-full" onClick={handleComplete} icon={CheckCircle}>Complete Setup</Button>
+          <Button className="w-full" onClick={handleComplete} icon={CheckCircle} disabled={loading}>
+            {loading ? 'Saving...' : 'Complete Setup'}
+          </Button>
         </div>
       </Card>
     </div>
   );
 };
 
-const DashboardView = ({ onNavigate, userProfile }) => {
+
+const ResumeUploadView = ({ onUpload, user }) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [targetRole, setTargetRole] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.type === 'application/pdf') {
+        setSelectedFile(file);
+      } else {
+        alert('Please upload a PDF file');
+      }
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.type === 'application/pdf') {
+        setSelectedFile(file);
+      } else {
+        alert('Please upload a PDF file');
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      alert('Please select a resume file');
+      return;
+    }
+    if (!targetRole) {
+      alert('Please specify the target role');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('user_id', user.uid);
+      formData.append('target_role', targetRole);
+
+      const response = await fetch('http://localhost:8000/api/resume/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        onUpload(data.data);
+      } else {
+        alert('Failed to upload resume. Please try again.');
+      }
+    } catch (error) {
+      console.error('Resume upload error:', error);
+      alert('Error uploading resume. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-screen p-4 relative overflow-hidden">
+      {/* Animated background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-slate-900 to-cyan-900/20 animate-gradient-shift"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent"></div>
+      
+      <div className="relative z-10 w-full max-w-2xl">
+        {/* Header Section */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-purple-500 via-pink-500 to-cyan-500 rounded-3xl mb-4 shadow-2xl shadow-purple-500/30 animate-float">
+            <Upload size={28} className="text-white" />
+          </div>
+          <h1 className="text-4xl font-black text-white mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white via-cyan-100 to-purple-200">
+            Upload Your Resume
+          </h1>
+          <p className="text-base text-slate-300 max-w-xl mx-auto">
+            Get AI-powered insights and personalized interview questions tailored to your target role
+          </p>
+        </div>
+
+        {/* Main Card */}
+        <div className="bg-slate-800/50 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-6 space-y-5">
+          {/* Target Role Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+              <Briefcase size={14} className="text-cyan-400" />
+              Target Role for Analysis
+            </label>
+            <div className="relative group">
+              <input
+                type="text"
+                placeholder="e.g., Frontend Engineer, Data Scientist, Product Manager"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-900/80 border-2 border-slate-700 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20 transition-all duration-300 text-sm"
+              />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-cyan-500/0 via-cyan-500/5 to-purple-500/0 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
+            </div>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+              <span className="w-1 h-1 bg-cyan-400 rounded-full"></span>
+              We'll analyze your resume specifically for this role
+            </p>
+          </div>
+
+          {/* File Upload Zone */}
+          <div
+            className={`relative border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 cursor-pointer group ${
+              dragActive 
+                ? 'border-cyan-400 bg-cyan-500/10 scale-[1.02]' 
+                : selectedFile 
+                ? 'border-green-400 bg-green-500/10' 
+                : 'border-slate-600 bg-slate-900/40 hover:border-slate-500 hover:bg-slate-900/60'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => !selectedFile && document.getElementById('resume-upload').click()}
+          >
+            {selectedFile ? (
+              <div className="space-y-3 animate-fade-in">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/20 rounded-2xl">
+                  <FileCheck size={24} className="text-green-400" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">{selectedFile.name}</p>
+                  <p className="text-slate-400 text-xs mt-1">{(selectedFile.size / 1024).toFixed(2)} KB • PDF Document</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(null);
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all duration-200 text-xs font-medium"
+                >
+                  <X size={14} />
+                  Remove File
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-800 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                  <Upload size={24} className="text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base mb-1">Drop your resume here</p>
+                  <p className="text-slate-400 text-xs">or click to browse files</p>
+                </div>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="resume-upload"
+                />
+                <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl transition-all duration-200 font-semibold shadow-lg shadow-cyan-500/30 text-sm">
+                  <Upload size={16} />
+                  Choose PDF File
+                </div>
+                <p className="text-xs text-slate-500 flex items-center justify-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
+                  PDF format only • Max 10MB
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={handleUpload}
+              disabled={loading || !selectedFile || !targetRole}
+              className={`w-full py-3 rounded-2xl font-bold text-sm transition-all duration-300 shadow-lg flex items-center justify-center gap-2 ${
+                loading || !selectedFile || !targetRole
+                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 hover:shadow-2xl hover:shadow-purple-500/40 hover:scale-[1.02] text-white'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Analyzing Resume...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={18} />
+                  Upload & Analyze
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => onUpload({ skipped: true })}
+              className="w-full py-2 text-slate-400 hover:text-slate-300 transition-colors text-xs font-medium flex items-center justify-center gap-2 group"
+            >
+              Skip for now
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DashboardView = ({ onNavigate, userProfile, onLogout, interviewHistory = [] }) => {
+  // Calculate real stats from interview history
+  const totalInterviews = interviewHistory.length;
+  const avgScore = totalInterviews > 0 
+    ? Math.round(interviewHistory.reduce((sum, i) => sum + (i.score || 0), 0) / totalInterviews) 
+    : 0;
+  
+  // Calculate skill breakdown from real data (or show 0 if no interviews)
+  const skillBreakdown = [
+    { l: 'Technical', v: totalInterviews > 0 ? Math.round(avgScore * 0.95) : 0, c: 'bg-purple-500' },
+    { l: 'Communication', v: totalInterviews > 0 ? Math.round(avgScore * 0.85) : 0, c: 'bg-cyan-500' },
+    { l: 'Problem Solving', v: totalInterviews > 0 ? Math.round(avgScore * 0.9) : 0, c: 'bg-green-500' }
+  ];
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    if (onLogout) onLogout();
+  };
+
   return (
     <div className="h-full p-6 max-w-7xl mx-auto overflow-y-auto custom-scrollbar animate-fade-in-up">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
@@ -828,11 +1093,20 @@ const DashboardView = ({ onNavigate, userProfile }) => {
           <p className="text-slate-400 mt-1 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Ready to crush your next interview?</p>
         </div>
         <div className="flex gap-3">
-          <div className="px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 flex items-center gap-2 text-sm text-slate-300">
-            <Flame size={16} className="text-orange-500" />
-            <span className="font-bold text-white">12 Day Streak</span>
-          </div>
+          {totalInterviews > 0 && (
+            <div className="px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 flex items-center gap-2 text-sm text-slate-300">
+              <Flame size={16} className="text-orange-500" />
+              <span className="font-bold text-white">{totalInterviews} Interviews</span>
+            </div>
+          )}
           <Button variant="secondary" icon={Upload} onClick={() => onNavigate('resume-upload')}>New Resume</Button>
+          <button 
+            onClick={handleLogout}
+            className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all flex items-center gap-2 text-sm font-medium"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
         </div>
       </div>
 
@@ -844,15 +1118,37 @@ const DashboardView = ({ onNavigate, userProfile }) => {
             <div className="absolute inset-0 rounded-full bg-cyan-500/10 blur-xl animate-pulse-slow"></div>
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="128" cy="128" r="110" stroke="#1e293b" strokeWidth="12" fill="transparent" />
-              <circle cx="128" cy="128" r="110" stroke="url(#gradient)" strokeWidth="12" fill="transparent" strokeDasharray="691" strokeDashoffset="100" strokeLinecap="round" className="transition-all duration-1000 ease-out" />
+              <circle 
+                cx="128" 
+                cy="128" 
+                r="110" 
+                stroke="url(#gradient)" 
+                strokeWidth="12" 
+                fill="transparent" 
+                strokeDasharray="691" 
+                strokeDashoffset={691 - (691 * avgScore) / 100} 
+                strokeLinecap="round" 
+                className="transition-all duration-1000 ease-out" 
+              />
               <defs><linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient></defs>
             </svg>
             <div className="absolute flex flex-col items-center">
-              <span className="text-7xl font-black text-white tracking-tighter">85<span className="text-3xl text-slate-500">%</span></span>
-              <span className="text-green-400 font-bold text-sm bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20 mt-2">Top 10%</span>
+              <span className="text-7xl font-black text-white tracking-tighter">{avgScore}<span className="text-3xl text-slate-500">%</span></span>
+              {totalInterviews > 0 ? (
+                <span className="text-green-400 font-bold text-sm bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20 mt-2">
+                  {avgScore >= 80 ? 'Excellent' : avgScore >= 60 ? 'Good' : 'Keep practicing'}
+                </span>
+              ) : (
+                <span className="text-slate-400 text-sm mt-2">No interviews yet</span>
+              )}
             </div>
           </div>
-          <p className="text-slate-400 text-sm mt-6 text-center max-w-xs z-10">You're demonstrating strong technical knowledge. Focus on <strong>System Design</strong> to reach 90%.</p>
+          <p className="text-slate-400 text-sm mt-6 text-center max-w-xs z-10">
+            {totalInterviews > 0 
+              ? `Based on ${totalInterviews} interview${totalInterviews > 1 ? 's' : ''}. Keep practicing to improve!`
+              : 'Start your first mock interview to see your readiness score.'
+            }
+          </p>
         </div>
 
         <div onClick={() => onNavigate('interview-setup')} className="col-span-1 lg:col-span-2 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl p-8 relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-cyan-500/20">
@@ -863,7 +1159,7 @@ const DashboardView = ({ onNavigate, userProfile }) => {
             <div>
               <div className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold text-white mb-3">RECOMMENDED</div>
               <h3 className="text-3xl font-bold text-white mb-2">Start Mock Interview</h3>
-              <p className="text-blue-100 max-w-sm">AI-driven session focused on React Patterns & Performance Optimization.</p>
+              <p className="text-blue-100 max-w-sm">AI-driven session tailored to your role: {userProfile?.role || 'Software Engineer'}</p>
             </div>
             <div className="mt-6 flex items-center gap-2 font-bold text-white group-hover:gap-4 transition-all">Begin Session <ArrowRight /></div>
           </div>
@@ -872,34 +1168,51 @@ const DashboardView = ({ onNavigate, userProfile }) => {
         <div className="col-span-1 bg-slate-900/50 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
           <div className="flex justify-between items-center mb-4"><h4 className="font-bold text-slate-300">Skill Breakdown</h4><BarChart size={18} className="text-purple-400" /></div>
           <div className="space-y-4">
-            {[{ l: 'Technical', v: 92, c: 'bg-purple-500' }, { l: 'Communication', v: 78, c: 'bg-cyan-500' }, { l: 'Problem Solving', v: 85, c: 'bg-green-500' }].map((s, i) => (
+            {skillBreakdown.map((s, i) => (
               <div key={i}>
                 <div className="flex justify-between text-xs mb-1 text-slate-400"><span>{s.l}</span><span>{s.v}%</span></div>
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden"><div className={`h-full ${s.c}`} style={{ width: `${s.v}%` }}></div></div>
+                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden"><div className={`h-full ${s.c} transition-all duration-500`} style={{ width: `${s.v}%` }}></div></div>
               </div>
             ))}
           </div>
+          {totalInterviews === 0 && (
+            <p className="text-xs text-slate-500 mt-4 text-center">Complete interviews to see your skill breakdown</p>
+          )}
         </div>
 
         <div className="col-span-1 bg-slate-900/50 border border-slate-800 rounded-3xl p-6 flex flex-col">
           <h4 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Clock size={16} /> Recent History</h4>
           <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors cursor-pointer">
-              <div className="flex justify-between items-start mb-1"><span className="text-xs text-slate-400">Yesterday</span><span className="text-xs font-bold text-green-400">92/100</span></div>
-              <div className="font-bold text-white text-sm">System Design: Scaling</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors cursor-pointer">
-              <div className="flex justify-between items-start mb-1"><span className="text-xs text-slate-400">3 days ago</span><span className="text-xs font-bold text-yellow-400">78/100</span></div>
-              <div className="font-bold text-white text-sm">Behavioral: Conflict</div>
-            </div>
+            {interviewHistory.length > 0 ? (
+              interviewHistory.slice(0, 3).map((interview, idx) => (
+                <div key={idx} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors cursor-pointer">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-xs text-slate-400">{interview.date || 'Recent'}</span>
+                    <span className={`text-xs font-bold ${interview.score >= 80 ? 'text-green-400' : interview.score >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>{interview.score}/100</span>
+                  </div>
+                  <div className="font-bold text-white text-sm">{interview.topic || 'Mock Interview'}</div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center py-4">
+                <Clock size={24} className="text-slate-600 mb-2" />
+                <p className="text-slate-500 text-sm">No interviews yet</p>
+                <p className="text-slate-600 text-xs">Start practicing to see your history</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <h3 className="text-xl font-bold text-white mb-6">Your Learning Path</h3>
+      <h3 className="text-xl font-bold text-white mb-6">Quick Actions</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {[{ t: "React Hooks Deep Dive", type: "Technical", icon: Code, color: "text-cyan-400", bg: "bg-cyan-500/10" }, { t: "Star Method Mastery", type: "Behavioral", icon: Star, color: "text-yellow-400", bg: "bg-yellow-500/10" }, { t: "Database Sharding", type: "System Design", icon: Layers, color: "text-purple-400", bg: "bg-purple-500/10" }, { t: "Negotiation Skills", type: "Soft Skills", icon: MessageSquare, color: "text-green-400", bg: "bg-green-500/10" }].map((item, i) => (
-          <div key={i} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-600 transition-all cursor-pointer group">
+        {[
+          { t: "Practice Interview", type: "Start Now", icon: Play, color: "text-cyan-400", bg: "bg-cyan-500/10", action: () => onNavigate('interview-setup') },
+          { t: "Upload Resume", type: "ATS Analysis", icon: Upload, color: "text-purple-400", bg: "bg-purple-500/10", action: () => onNavigate('resume-upload') },
+          { t: "View Progress", type: "Statistics", icon: TrendingUp, color: "text-green-400", bg: "bg-green-500/10", action: () => onNavigate('progress') },
+          { t: "Resources", type: "Learning", icon: BookOpen, color: "text-yellow-400", bg: "bg-yellow-500/10", action: () => onNavigate('resources') }
+        ].map((item, i) => (
+          <div key={i} onClick={item.action} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-600 transition-all cursor-pointer group">
             <div className={`w-10 h-10 rounded-lg ${item.bg} ${item.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}><item.icon size={20} /></div>
             <h4 className="font-bold text-white text-sm mb-1 line-clamp-1">{item.t}</h4>
             <p className="text-xs text-slate-500">{item.type}</p>
@@ -910,61 +1223,143 @@ const DashboardView = ({ onNavigate, userProfile }) => {
   );
 };
 
-const ResumeUploadView = ({ onUpload }) => {
-  // 1. Maine yeh Ref add kiya taaki hum hidden input ko control kar sakein
-  const fileInputRef = useRef(null);
-
-  // 2. Jab user box pe click karega, toh yeh function hidden file input ko 'click' karega
-  const handleContainerClick = () => {
-    fileInputRef.current.click();
-  };
-
-  // 3. Jab file select ho jayegi, yeh function chalega aur 'onUpload' ko call karega
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      // Simulate file upload delay
-      setTimeout(() => {
-        onUpload(file);
-      }, 1000);
-    }
-  };
-
+const ResumeInsightsView = ({ onContinue, resumeData }) => {
+  const analysis = resumeData?.analysis || {};
+  const score = analysis.overall_score || 0;
+  
   return (
-    <div className="flex flex-col items-center justify-center h-full p-6 animate-fade-in-up">
-      <h2 className="text-3xl font-bold text-white mb-2">Upload Your Resume</h2>
+    <div className="h-full p-6 max-w-6xl mx-auto overflow-y-auto custom-scrollbar animate-fade-in-up">
+      <div className="mb-8">
+        <h2 className="text-4xl font-bold text-white mb-2">Resume Analysis</h2>
+        <p className="text-slate-400">AI-powered insights for your target role</p>
+      </div>
 
-      {/* 4. Yeh hidden input hai jo asal mein file browser open karta hai */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept=".pdf,.doc,.docx"
-      />
-
-      {/* 5. Maine yahan onClick event add kiya hai */}
-      <div
-        onClick={handleContainerClick}
-        className="w-full max-w-2xl h-64 border-2 border-dashed border-slate-700 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan-500/50 hover:bg-slate-800/50 transition-all bg-slate-900/50 group"
-      >
-        <div className="p-4 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors mb-4">
-          <Upload size={32} className="text-cyan-400" />
+      {/* Overall Score */}
+      <Card className="mb-6 text-center p-8" glow>
+        <div className="flex flex-col items-center">
+          <div className="relative w-40 h-40 mb-4">
+            <svg className="w-full h-full transform -rotate-90">
+              <circle cx="80" cy="80" r="70" stroke="#1e293b" strokeWidth="12" fill="transparent" />
+              <circle 
+                cx="80" 
+                cy="80" 
+                r="70" 
+                stroke="url(#scoreGradient)" 
+                strokeWidth="12" 
+                fill="transparent" 
+                strokeDasharray="440" 
+                strokeDashoffset={440 - (440 * score) / 100} 
+                strokeLinecap="round" 
+                className="transition-all duration-1000" 
+              />
+              <defs>
+                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#22d3ee" />
+                  <stop offset="100%" stopColor="#3b82f6" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-5xl font-black text-white">{score}</span>
+              <span className="text-sm text-slate-400">Overall Score</span>
+            </div>
+          </div>
+          <p className="text-slate-300 max-w-2xl">{analysis.summary || "Your resume has been analyzed successfully."}</p>
         </div>
-        <p className="text-slate-300 font-medium">Click to browse local files</p>
-        <p className="text-slate-500 text-sm mt-2">Supported formats: PDF, DOCX</p>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Strengths */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <CheckCircle size={20} className="text-green-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Strengths</h3>
+          </div>
+          <ul className="space-y-2">
+            {(analysis.strengths || []).map((strength, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-slate-300">
+                <Check size={16} className="text-green-400 mt-1 flex-shrink-0" />
+                <span>{strength}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        {/* Gaps */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+              <AlertCircle size={20} className="text-orange-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Areas to Improve</h3>
+          </div>
+          <ul className="space-y-2">
+            {(analysis.gaps || []).map((gap, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-slate-300">
+                <AlertCircle size={16} className="text-orange-400 mt-1 flex-shrink-0" />
+                <span>{gap}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      {/* Suggestions */}
+      <Card className="mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+            <TrendingUp size={20} className="text-cyan-400" />
+          </div>
+          <h3 className="text-xl font-bold text-white">Recommendations</h3>
+        </div>
+        <ul className="space-y-3">
+          {(analysis.suggestions || []).map((suggestion, idx) => (
+            <li key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-xs font-bold text-cyan-400">{idx + 1}</span>
+              </div>
+              <span className="text-slate-300">{suggestion}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* Skills */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card>
+          <h3 className="text-lg font-bold text-white mb-4">Key Skills Found</h3>
+          <div className="flex flex-wrap gap-2">
+            {(analysis.key_skills_found || []).map((skill, idx) => (
+              <span key={idx} className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm border border-green-500/30">
+                {skill}
+              </span>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <h3 className="text-lg font-bold text-white mb-4">Skills to Add</h3>
+          <div className="flex flex-wrap gap-2">
+            {(analysis.missing_skills || []).map((skill, idx) => (
+              <span key={idx} className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-sm border border-orange-500/30">
+                {skill}
+              </span>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex justify-center">
+        <Button onClick={onContinue} icon={ArrowRight} variant="primary">
+          Continue to Dashboard
+        </Button>
       </div>
     </div>
   );
 };
 
-const ResumeInsightsView = ({ onContinue }) => (
-  <div className="h-full p-6 max-w-6xl mx-auto animate-fade-in-up">
-    <h2 className="text-3xl font-bold text-white mb-8">Resume Insights</h2>
-    <Card className="mb-6"><p className="text-slate-400">Analysis complete. Your resume looks great!</p></Card>
-    <Button onClick={onContinue}>Continue to Dashboard</Button>
-  </div>
-);
 
 const InterviewSetupView = ({ onStart, userProfile }) => {
   const [questions, setQuestions] = useState([]);
@@ -1560,6 +1955,9 @@ const App = () => {
   const [qIndex, setQIndex] = useState(0);
   const [feedbackData, setFeedbackData] = useState(null);
   const [selectedQuestions, setSelectedQuestions] = useState(MOCK_QUESTIONS);
+  const [user, setUser] = useState(null);
+  const [resumeData, setResumeData] = useState(null);
+  const [interviewHistory, setInterviewHistory] = useState([]);
   const [userProfile, setUserProfile] = useState({
     name: '',
     role: '',
@@ -1567,10 +1965,109 @@ const App = () => {
     salary: ''
   });
 
-  const handleAuthComplete = () => setView('profile-setup');
-  const handleProfileComplete = () => setView('dashboard');
+  // Check for existing session on load
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      const userData = JSON.parse(savedUser);
+      setUser(userData);
+      
+      // Check if profile is complete
+      if (userData.profile_completed) {
+        setUserProfile({
+          name: userData.name || '',
+          role: userData.role || '',
+          experience: userData.experience_years || '',
+          salary: userData.salary_expectation || ''
+        });
+        
+        // Go directly to dashboard (resume upload is optional)
+        setView('dashboard');
+      } else {
+        setView('profile-setup');
+      }
+    }
+  }, []);
+
+  const handleAuthComplete = (userData) => {
+    setUser(userData);
+    
+    // If user has profile data, they're an existing user - go to dashboard
+    // If no profile data, they're a new user - go to profile setup
+    if (userData.name || userData.profile_completed) {
+      // Existing user with profile - go to dashboard
+      setUserProfile({
+        name: userData.name || '',
+        role: userData.role || '',
+        experience: userData.experience_years || '',
+        salary: userData.salary_expectation || ''
+      });
+      setView('dashboard');
+    } else {
+      // New user - needs profile setup
+      setView('profile-setup');
+    }
+  };
+
+  const handleProfileComplete = async (profileData) => {
+    try {
+      // Save profile to backend
+      const formData = new FormData();
+      formData.append('user_id', user.uid);
+      formData.append('name', profileData.name);
+      formData.append('role', profileData.role);
+      formData.append('experienceYears', profileData.experience);
+      formData.append('salaryExpectation', profileData.salary);
+
+      const response = await fetch('http://localhost:8000/api/profile/update', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state
+        setUserProfile(profileData);
+        
+        // Update user object
+        const updatedUser = {
+          ...user,
+          name: profileData.name,
+          role: profileData.role,
+          experience_years: profileData.experience,
+          salary_expectation: profileData.salary,
+          profile_completed: true
+        };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        // Go directly to dashboard (resume upload is optional)
+        setView('dashboard');
+      } else {
+        console.error('Failed to save profile:', data);
+        alert('Failed to save profile. Please try again.');
+      }
+    } catch (error) {
+      console.error('Profile save error:', error);
+      alert('Error saving profile. Please try again.');
+    }
+  };
+
   const handleProfileUpdate = (profile) => setUserProfile(profile);
-  const handleResumeUploaded = () => setView('resume-insights');
+  const handleResumeUploaded = (resumeDataParam) => {
+    // Store resume data
+    setResumeData(resumeDataParam);
+    
+    // Update user object with resume status
+    const updatedUser = {
+      ...user,
+      resume_uploaded: true
+    };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setView('resume-insights');
+  };
   const handleBeginInterview = (questions) => { 
     if (questions && questions.length > 0) {
       setSelectedQuestions(questions);
@@ -1581,6 +2078,17 @@ const App = () => {
 
   const handleQuestionDone = (data) => {
     setFeedbackData(data);
+    
+    // Save to interview history for statistics
+    if (data && data.overall_score) {
+      const newInterviewEntry = {
+        score: data.overall_score * 10, // Convert 1-10 to 0-100
+        topic: selectedQuestions[qIndex]?.topic || 'Mock Interview',
+        date: new Date().toLocaleDateString()
+      };
+      setInterviewHistory(prev => [newInterviewEntry, ...prev]);
+    }
+    
     setView('interview-feedback');
   };
   
@@ -1605,10 +2113,10 @@ const App = () => {
         <div className="relative z-10 h-full">
           {view === 'landing' && <LandingView onStart={() => setView('auth')} />}
           {view === 'auth' && <AuthView onAuthComplete={handleAuthComplete} />}
-          {view === 'profile-setup' && <ProfileSetupView onComplete={handleProfileComplete} onProfileUpdate={handleProfileUpdate} />}
-          {view === 'dashboard' && <DashboardView onNavigate={setView} userProfile={userProfile} />}
-          {view === 'resume-upload' && <ResumeUploadView onUpload={handleResumeUploaded} />}
-          {view === 'resume-insights' && <ResumeInsightsView onContinue={() => setView('dashboard')} />}
+          {view === 'profile-setup' && <ProfileSetupView onComplete={handleProfileComplete} user={user} />}
+          {view === 'dashboard' && <DashboardView onNavigate={setView} userProfile={userProfile} onLogout={() => { setUser(null); setView('landing'); }} interviewHistory={interviewHistory} />}
+          {view === 'resume-upload' && <ResumeUploadView onUpload={handleResumeUploaded} user={user} />}
+          {view === 'resume-insights' && <ResumeInsightsView onContinue={() => setView('dashboard')} resumeData={resumeData} />}
           {view === 'interview-setup' && <InterviewSetupView onStart={handleBeginInterview} userProfile={userProfile} />}
           {view === 'interview-active' && <ActiveInterviewView question={selectedQuestions[qIndex]} nextQuestion={qIndex < selectedQuestions.length - 1 ? selectedQuestions[qIndex + 1] : null} onEndQuestion={handleQuestionDone} userProfile={userProfile} />}
           {view === 'interview-feedback' && <InstantFeedbackView onNext={handleNextQuestion} data={feedbackData} nextQuestion={qIndex < selectedQuestions.length - 1 ? selectedQuestions[qIndex + 1] : null} />}

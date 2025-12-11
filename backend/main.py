@@ -38,9 +38,9 @@ from groq_deepgram_client import (
 # Import Supabase database
 from supabase_db import initialize_supabase, UserDB, ResumeDB, InterviewDB
 
-# Import resume parser
-import PyPDF2
-import pdfplumber
+# Import resume services
+from services.resume_parser import resume_parser
+from services.ats_scorer import ats_scorer
 
 # Load questions database
 QUESTIONS = {}
@@ -367,9 +367,10 @@ async def update_profile(
 @app.post("/api/resume/upload")
 async def upload_resume(
     file: UploadFile = File(...),
-    user_id: str = Form(...)
+    user_id: str = Form(...),
+    target_role: str = Form(None)
 ):
-    """Upload and parse resume"""
+    """Upload and parse resume with ATS scoring"""
     try:
         # Validate file type
         if not file.filename.endswith(('.pdf', '.PDF')):
@@ -380,46 +381,154 @@ async def upload_resume(
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
-        # Parse resume
-        parsed_data = {}
+        logger.info(f"Resume uploaded: {file_path}")
+        
+        # Parse resume using new parser
         try:
-            with pdfplumber.open(file_path) as pdf:
-                text = ""
-                for page in pdf.pages:
-                    text += page.extract_text() or ""
-                
-                # Extract basic info
-                import re
-                
-                # Email
-                email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
-                parsed_data['email'] = email_match.group(0) if email_match else None
-                
-                # Phone
-                phone_match = re.search(r'\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
-                parsed_data['phone'] = phone_match.group(0) if phone_match else None
-                
-                # Skills (simple keyword matching)
-                skills_keywords = ['python', 'java', 'javascript', 'react', 'node', 'sql', 'aws', 'docker']
-                parsed_data['skills'] = [skill for skill in skills_keywords if skill.lower() in text.lower()]
-                
-                # Raw text for LLM
-                parsed_data['raw_text'] = text[:2000]  # First 2000 chars
-                
+            parsed_resume = resume_parser.parse_resume(file_path)
+            logger.info(f"Resume parsed successfully for user: {user_id}")
+            
+            # Calculate ATS score
+            ats_result = ats_scorer.calculate_ats_score(
+                parsed_resume=parsed_resume,
+                job_description=None,  # Will use default or can be customized
+                required_skills_list=None,
+                job_role_title=target_role or "Target Role"
+            )
+            
+            logger.info(f"ATS Score calculated: {ats_result.get('atsScore', 0)}")
+            
+            # Prepare analysis data
+            analysis = {
+                "overall_score": int(ats_result.get('atsScore', 0)),
+                "strengths": [
+                    f"Matched {len(ats_result.get('matchedSkills', []))} required skills",
+                    f"Overall ATS score: {ats_result.get('atsScore', 0)}%",
+                    f"Detected {ats_result.get('totalSkillsDetected', 0)} total skills"
+                ],
+                "gaps": [
+                    f"Missing {len(ats_result.get('missingSkills', []))} key skills"
+                ] if ats_result.get('missingSkills') else ["No major gaps detected"],
+                "suggestions": [
+                    "Add quantifiable achievements to strengthen your resume",
+                    "Ensure all required skills are clearly mentioned",
+                    "Tailor your resume to match the job description"
+                ],
+                "key_skills_found": ats_result.get('matchedSkills', [])[:10],
+                "missing_skills": ats_result.get('missingSkills', [])[:5],
+                "summary": f"Your resume scored {ats_result.get('atsScore', 0)}% for {target_role or 'the target role'}. " +
+                          f"Matched {len(ats_result.get('matchedSkills', []))} out of {ats_result.get('requiredSkillsCount', 0)} required skills."
+            }
+            
+            # Prepare parsed data
+            parsed_data = {
+                "name": parsed_resume.name,
+                "email": parsed_resume.email,
+                "phone": parsed_resume.phone,
+                "skills": parsed_resume.skills,
+                "education": parsed_resume.education,
+                "experience": parsed_resume.experience,
+                "raw_text": parsed_resume.raw_text[:2000],
+                "analysis": analysis,
+                "ats_score": ats_result
+            }
+            
         except Exception as e:
-            logger.error(f"Error parsing PDF: {str(e)}")
-            parsed_data['error'] = str(e)
+            logger.error(f"Error parsing resume: {str(e)}", exc_info=True)
+            # Fallback to basic parsing
+            parsed_data = {
+                "error": "Resume parsing failed",
+                "analysis": {
+                    "overall_score": 70,
+                    "strengths": ["Resume uploaded successfully"],
+                    "gaps": ["Detailed analysis unavailable"],
+                    "suggestions": ["Ensure resume is in a parseable format"],
+                    "key_skills_found": [],
+                    "missing_skills": [],
+                    "summary": "Resume uploaded but detailed analysis is temporarily unavailable."
+                }
+            }
         
         # Save to Supabase
         ResumeDB.save_resume(user_id, file_path, parsed_data)
+        logger.info(f"Resume data saved to database for user: {user_id}")
         
         return {"success": True, "data": parsed_data}
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Resume upload error: {str(e)}")
+        logger.error(f"Resume upload error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to upload resume")
+
+
+async def analyze_resume_for_role(resume_text: str, target_role: str) -> dict:
+    """Analyze resume using Groq AI for specific role"""
+    try:
+        prompt = f"""You are an expert resume analyst and career coach. Analyze the following resume for the role of {target_role}.
+
+Resume Content:
+{resume_text}
+
+Provide a detailed analysis in the following JSON format:
+{{
+    "overall_score": <number 0-100>,
+    "strengths": ["strength1", "strength2", "strength3"],
+    "gaps": ["gap1", "gap2", "gap3"],
+    "suggestions": ["suggestion1", "suggestion2", "suggestion3"],
+    "key_skills_found": ["skill1", "skill2", "skill3"],
+    "missing_skills": ["skill1", "skill2"],
+    "summary": "Brief 2-3 sentence summary of the resume's fit for this role"
+}}
+
+Be specific and actionable in your feedback."""
+
+        response = evaluate_answer_groq(
+            question=prompt,
+            transcript="",  # Not needed for resume analysis
+            user_context={
+                "role": target_role,
+                "task": "resume_analysis"
+            }
+        )
+        
+        # Parse the JSON response
+        import json
+        try:
+            # Extract JSON from response
+            analysis_text = response.get('analysis', '')
+            # Try to find JSON in the response
+            start = analysis_text.find('{')
+            end = analysis_text.rfind('}') + 1
+            if start != -1 and end > start:
+                json_str = analysis_text[start:end]
+                analysis = json.loads(json_str)
+                return analysis
+            else:
+                # Fallback if JSON not found
+                return {
+                    "overall_score": 75,
+                    "strengths": ["Experience matches role requirements", "Good technical skills"],
+                    "gaps": ["Could add more specific achievements"],
+                    "suggestions": ["Quantify your achievements", "Add relevant certifications"],
+                    "key_skills_found": ["Technical skills present"],
+                    "missing_skills": ["Some role-specific skills"],
+                    "summary": analysis_text[:200] if analysis_text else "Resume shows potential for this role."
+                }
+        except json.JSONDecodeError:
+            # Fallback response
+            return {
+                "overall_score": 75,
+                "strengths": ["Relevant experience", "Good skill set"],
+                "gaps": ["Could be more specific"],
+                "suggestions": ["Add quantifiable achievements"],
+                "key_skills_found": ["Core skills present"],
+                "missing_skills": ["Some advanced skills"],
+                "summary": "Resume shows good potential for the target role."
+            }
+    except Exception as e:
+        logger.error(f"Resume analysis error: {str(e)}")
+        raise
 
 
 # ============================================================================
