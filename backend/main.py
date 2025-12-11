@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 from groq_deepgram_client import (
     transcribe_audio_deepgram,
     evaluate_answer_groq,
+    generate_dynamic_questions,
     test_groq_connection,
     test_deepgram_connection
 )
@@ -196,6 +197,84 @@ def health_check():
     }
 
 
+@app.post("/api/questions/generate")
+@limiter.limit(RATE_LIMIT)
+async def generate_questions(
+    request: Request,
+    role: Optional[str] = Form(None),
+    experience_years: Optional[str] = Form(None, alias="experienceYears"),
+    skills: Optional[str] = Form(None)  # Comma-separated skills
+):
+    """
+    Generate personalized interview questions based on user profile.
+    
+    Args:
+        role: Job role (e.g., "Frontend Engineer", "SDE1")
+        experience_years: Years of experience
+        skills: Comma-separated list of skills
+        
+    Returns:
+        JSON with generated questions or fallback to static questions
+    """
+    logger.info(f"Generating questions for role={role}, experience={experience_years}")
+    
+    # Parse skills if provided
+    skills_list = None
+    if skills:
+        skills_list = [s.strip() for s in skills.split(",") if s.strip()]
+    
+    # Try to generate dynamic questions
+    result = generate_dynamic_questions(
+        role=role or "General",
+        experience_years=experience_years,
+        skills=skills_list,
+        num_questions=3
+    )
+    
+    # If generation failed or returned no questions, fallback to static questions
+    if result.get("error") or not result.get("questions"):
+        logger.warning(f"Dynamic generation failed: {result.get('error')}, falling back to static questions")
+        
+        # Get static questions from questions.json based on role
+        role_key = role.lower().replace(" ", "_") if role else "general"
+        static_questions = []
+        
+        for qid, qdata in QUESTIONS.items():
+            if role_key in qid.lower() or qdata.get("role", "").lower() == role.lower():
+                static_questions.append({
+                    "id": qid,
+                    "question": qdata.get("question"),
+                    "difficulty": "Medium",
+                    "focus": "General",
+                    "topic": qdata.get("role", "General")
+                })
+        
+        # If no role-specific questions, return first 3 from database
+        if not static_questions:
+            static_questions = [
+                {
+                    "id": qid,
+                    "question": qdata.get("question"),
+                    "difficulty": "Medium",
+                    "focus": "General",
+                    "topic": qdata.get("role", "General")
+                }
+                for qid, qdata in list(QUESTIONS.items())[:3]
+            ]
+        
+        return {
+            "questions": static_questions[:3],
+            "source": "static",
+            "error": result.get("error")
+        }
+    
+    return {
+        "questions": result.get("questions", []),
+        "source": "dynamic",
+        "error": None
+    }
+
+
 @app.post("/api/analyze")
 @limiter.limit(RATE_LIMIT)
 async def analyze_video(
@@ -203,7 +282,10 @@ async def analyze_video(
     file: UploadFile = File(...),
     role: Optional[str] = Form(None),
     question_id: Optional[str] = Form(None, alias="questionId"),
-    question: Optional[str] = Form(None)  # Allow direct question text as fallback
+    question: Optional[str] = Form(None),  # Allow direct question text as fallback
+    candidate_name: Optional[str] = Form(None, alias="candidateName"),
+    experience_years: Optional[str] = Form(None, alias="experienceYears"),
+    salary_expectation: Optional[str] = Form(None, alias="salaryExpectation")
 ):
     """
     Analyze uploaded interview video using HF Inference API.
@@ -286,13 +368,24 @@ async def analyze_video(
             
             logger.info(f"Visual analysis: eyeContact={visual_stats['eyeContact']}, posture={visual_stats['posture']}")
 
-            # 7. Content Analysis using Groq LLM
+            # 7. Content Analysis using Groq LLM with user context
             # Get question text from database or use provided question
             question_data = QUESTIONS.get(question_id, {})
             question_text = question_data.get("question") or question or "General interview question"
             
             logger.info(f"Calling Groq evaluation API for question: {question_text[:50]}...")
-            evaluation_result = evaluate_answer_groq(question_text, transcript_text, role or "General")
+            logger.info(f"User context: name={candidate_name}, exp={experience_years}, salary={salary_expectation}")
+            
+            evaluation_result = evaluate_answer_groq(
+                question=question_text,
+                transcript=transcript_text,
+                role=role or "General",
+                candidate_name=candidate_name,
+                experience_years=experience_years,
+                salary_expectation=salary_expectation,
+                visual_metrics=visual_stats,
+                speech_metrics=speech_stats
+            )
             
             evaluation_error = evaluation_result.get("error")
             if evaluation_error:
@@ -321,36 +414,43 @@ async def analyze_video(
             )
 
             # 9. Build response
-            response_data = {
+            # Return response with both 'evaluation' and 'content' for compatibility
+            evaluation_data = {
+                "score": evaluation_result.get("score", 0),
+                "reasoning": evaluation_result.get("reasoning", ""),
+                "suggestions": evaluation_result.get("suggestions", []),
+                "confidence_assessment": evaluation_result.get("confidence_assessment", ""),
+                "communication_quality": evaluation_result.get("communication_quality", ""),
+                "feedback": evaluation_result.get("reasoning", "Keep practicing!")  # For frontend compatibility
+            } if not evaluation_error else None
+            
+            return {
                 "role": role,
                 "questionId": question_id,
                 "transcript": transcript_text,
                 "transcriptionError": transcription_error,
-                "video": video_stats,
+                "video": {
+                    "fps": video_stats["fps"],
+                    "frameCount": video_stats["frameCount"],
+                    "durationSeconds": video_stats["durationSeconds"]
+                },
                 "speech": speech_stats,
                 "visual": visual_stats,
-                "evaluation": {
-                    "score": evaluation_result.get("score", 0),
-                    "reasoning": evaluation_result.get("reasoning", ""),
-                    "suggestions": evaluation_result.get("suggestions", [])
-                } if not evaluation_error else None,
+                "evaluation": evaluation_data,  # For backend consistency
+                "content": evaluation_data,  # For frontend compatibility
                 "evaluationError": evaluation_error,
                 "overallScore": overall_score,
-                "speechScore": round(speech_score, 1)
+                "speechScore": speech_score
             }
-            
-            logger.info(f"Analysis complete: overallScore={overall_score}")
-            return response_data
-
+        
         except HTTPException:
             raise
-        
         except Exception as e:
-            logger.exception("Error processing video")
+            logger.error(f"Unexpected error during video analysis: {str(e)}")
             return JSONResponse(
-                status_code=500, 
+                status_code=500,
                 content={
-                    "error": str(e),
+                    "error": "Internal server error during video analysis",
                     "role": role,
                     "questionId": question_id,
                     "transcript": "",

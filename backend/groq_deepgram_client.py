@@ -70,24 +70,40 @@ def transcribe_audio_deepgram(audio_bytes: bytes, language: str = "en") -> dict:
         return {"text": "", "error": f"Transcription failed: {str(e)}"}
 
 
-def evaluate_answer_groq(question: str, transcript: str, role: str = "SDE") -> dict:
+def evaluate_answer_groq(
+    question: str, 
+    transcript: str, 
+    role: str = "SDE",
+    candidate_name: Optional[str] = None,
+    experience_years: Optional[str] = None,
+    salary_expectation: Optional[str] = None,
+    visual_metrics: Optional[dict] = None,
+    speech_metrics: Optional[dict] = None
+) -> dict:
     """
-    Evaluate interview answer using Groq API.
+    Evaluate interview answer using Groq API with comprehensive criteria.
     
     Args:
         question: The interview question text
         transcript: The candidate's answer transcript
         role: Job role context (e.g., "SDE", "Frontend")
+        candidate_name: Candidate's name (optional)
+        experience_years: Years of experience (optional)
+        salary_expectation: Expected salary (optional)
+        visual_metrics: Dict with eye_contact, posture scores (optional)
+        speech_metrics: Dict with wpm, filler_count (optional)
         
     Returns:
         dict: {
             "score": float (1-10),
             "reasoning": str,
             "suggestions": list[str],
+            "confidence_assessment": str,
+            "communication_quality": str,
             "error": str | None
         }
     """
-    logger.info(f"Evaluating answer with Groq for role={role}")
+    logger.info(f"Evaluating answer with Groq for role={role}, candidate={candidate_name or 'Anonymous'}")
     
     if not GROQ_API_KEY:
         logger.error("GROQ_API_KEY not set")
@@ -95,11 +111,35 @@ def evaluate_answer_groq(question: str, transcript: str, role: str = "SDE") -> d
             "score": 0,
             "reasoning": "Groq API key not configured",
             "suggestions": [],
+            "confidence_assessment": "Unable to assess",
+            "communication_quality": "Unable to assess",
             "error": "API key missing"
         }
     
     try:
         import requests
+        
+        # Build candidate profile section
+        profile_section = "CANDIDATE PROFILE:\n"
+        if candidate_name:
+            profile_section += f"- Name: {candidate_name}\n"
+        profile_section += f"- Target Role: {role}\n"
+        if experience_years:
+            profile_section += f"- Experience: {experience_years} years\n"
+        if salary_expectation:
+            profile_section += f"- Salary Expectation: {salary_expectation}\n"
+        
+        # Build metrics section
+        metrics_section = ""
+        if visual_metrics:
+            metrics_section += "\nVISUAL ANALYSIS (from video):\n"
+            metrics_section += f"- Eye Contact: {visual_metrics.get('eyeContact', 0)}%\n"
+            metrics_section += f"- Posture: {visual_metrics.get('posture', 0)}/100\n"
+        
+        if speech_metrics:
+            metrics_section += "\nSPEECH METRICS:\n"
+            metrics_section += f"- Words Per Minute: {speech_metrics.get('wordsPerMinute', 0)}\n"
+            metrics_section += f"- Filler Words: {speech_metrics.get('fillerCount', 0)}\n"
         
         # Use Groq REST API directly (OpenAI-compatible endpoint)
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -109,19 +149,52 @@ def evaluate_answer_groq(question: str, transcript: str, role: str = "SDE") -> d
             "Content-Type": "application/json"
         }
         
-        # Construct prompt for structured evaluation
-        prompt = f"""You are an expert technical interviewer evaluating a candidate's answer.
+        # Construct comprehensive evaluation prompt with enhanced context
+        prompt = f"""You are an expert technical interviewer evaluating a candidate's interview performance.
 
-Role: {role}
-Question: {question}
+{profile_section}
+INTERVIEW QUESTION:
+{question}
 
-Candidate's Answer:
+CANDIDATE'S ANSWER:
 {transcript}
+{metrics_section}
 
-Evaluate this answer and provide a JSON response with:
-1. "score": A number from 1-10 based on clarity, technical depth, and relevance
-2. "reasoning": A 2-3 sentence explanation of the score
-3. "suggestions": An array of exactly 3 specific improvement suggestions
+EVALUATION CRITERIA:
+1. Content Quality (40%): Technical accuracy, depth of knowledge, relevance to question
+2. Communication (30%): Clarity, confidence, minimal fumbling/filler words
+3. Visual Presence (20%): Eye contact, posture, professional demeanor
+4. Speech Delivery (10%): Appropriate pacing, minimal filler words
+
+Provide a comprehensive evaluation as JSON with:
+{{
+  "score": <1-10 overall score based on weighted criteria>,
+  "reasoning": "<2-3 sentences explaining the score, highlighting strengths and weaknesses>",
+  "suggestions": [
+    {{
+      "improvement": "<specific, actionable improvement>",
+      "context": "<quote a SHORT phrase from transcript where this applies, or 'General' if applies throughout>",
+      "better_approach": "<suggest what they could say instead or how to improve>"
+    }},
+    {{
+      "improvement": "<specific, actionable improvement>",
+      "context": "<quote a SHORT phrase from transcript where this applies, or 'General' if applies throughout>",
+      "better_approach": "<suggest what they could say instead or how to improve>"
+    }},
+    {{
+      "improvement": "<specific, actionable improvement>",
+      "context": "<quote a SHORT phrase from transcript where this applies, or 'General' if applies throughout>",
+      "better_approach": "<suggest what they could say instead or how to improve>"
+    }}
+  ],
+  "confidence_assessment": "<brief assessment of candidate's confidence level based on speech and visual cues>",
+  "communication_quality": "<brief assessment of communication style and clarity>",
+  "behavioral_insights": {{
+    "eye_contact_analysis": "<analysis of eye contact consistency based on visual metrics>",
+    "filler_word_impact": "<how filler words affected the delivery>",
+    "speech_pace_feedback": "<feedback on speaking pace based on WPM>"
+  }}
+}}
 
 Respond ONLY with valid JSON, no other text."""
 
@@ -134,7 +207,7 @@ Respond ONLY with valid JSON, no other text."""
                 }
             ],
             "temperature": 0.3,
-            "max_tokens": 500
+            "max_tokens": 600
         }
         
         # Call Groq API
@@ -147,6 +220,8 @@ Respond ONLY with valid JSON, no other text."""
                 "score": 0,
                 "reasoning": "Evaluation failed",
                 "suggestions": [],
+                "confidence_assessment": "Unable to assess",
+                "communication_quality": "Unable to assess",
                 "error": error_msg
             }
         
@@ -183,16 +258,52 @@ Respond ONLY with valid JSON, no other text."""
         if not isinstance(suggestions, list):
             suggestions = [str(suggestions)]
         
+        # Normalize suggestions to enhanced format
+        normalized_suggestions = []
+        for sug in suggestions[:3]:  # Limit to 3 suggestions
+            if isinstance(sug, dict):
+                # Already in enhanced format
+                normalized_suggestions.append({
+                    "improvement": sug.get("improvement", "Continue practicing"),
+                    "context": sug.get("context", "General"),
+                    "better_approach": sug.get("better_approach", "")
+                })
+            else:
+                # Old format (simple string) - convert to enhanced format
+                normalized_suggestions.append({
+                    "improvement": str(sug),
+                    "context": "General",
+                    "better_approach": ""
+                })
+        
         # Ensure exactly 3 suggestions
-        while len(suggestions) < 3:
-            suggestions.append("Continue practicing interview questions")
-        suggestions = suggestions[:3]
+        while len(normalized_suggestions) < 3:
+            normalized_suggestions.append({
+                "improvement": "Continue practicing interview questions",
+                "context": "General",
+                "better_approach": "Practice with a variety of question types"
+            })
+        
+        confidence_assessment = evaluation.get("confidence_assessment", "Moderate confidence displayed")
+        communication_quality = evaluation.get("communication_quality", "Clear communication")
+        
+        # Extract behavioral insights
+        behavioral_insights = evaluation.get("behavioral_insights", {})
+        if not isinstance(behavioral_insights, dict):
+            behavioral_insights = {}
         
         logger.info(f"Evaluation successful: score={score}")
         return {
             "score": score,
             "reasoning": reasoning,
-            "suggestions": suggestions,
+            "suggestions": normalized_suggestions,
+            "confidence_assessment": confidence_assessment,
+            "communication_quality": communication_quality,
+            "behavioral_insights": {
+                "eye_contact_analysis": behavioral_insights.get("eye_contact_analysis", ""),
+                "filler_word_impact": behavioral_insights.get("filler_word_impact", ""),
+                "speech_pace_feedback": behavioral_insights.get("speech_pace_feedback", "")
+            },
             "error": None
         }
     
@@ -219,6 +330,141 @@ Respond ONLY with valid JSON, no other text."""
             "reasoning": "Evaluation failed",
             "suggestions": [],
             "error": f"Groq API error: {str(e)}"
+        }
+
+
+def generate_dynamic_questions(
+    role: str,
+    experience_years: Optional[str] = None,
+    skills: Optional[list] = None,
+    num_questions: int = 3
+) -> dict:
+    """
+    Generate personalized interview questions using Groq API.
+    
+    Args:
+        role: Job role (e.g., "Frontend Engineer", "SDE1")
+        experience_years: Years of experience (optional)
+        skills: List of skills from resume (optional)
+        num_questions: Number of questions to generate (default: 3)
+        
+    Returns:
+        dict: {
+            "questions": list[dict] with id, question, difficulty, focus,
+            "error": str | None
+        }
+    """
+    logger.info(f"Generating {num_questions} questions for role={role}, experience={experience_years}")
+    
+    if not GROQ_API_KEY:
+        logger.error("GROQ_API_KEY not set")
+        return {
+            "questions": [],
+            "error": "API key not configured"
+        }
+    
+    try:
+        import requests
+        
+        # Build context
+        context = f"Role: {role}\n"
+        if experience_years:
+            context += f"Experience: {experience_years} years\n"
+        if skills:
+            context += f"Skills: {', '.join(skills[:5])}\n"
+        
+        # Determine difficulty based on experience
+        difficulty_guidance = ""
+        if experience_years:
+            try:
+                years = int(experience_years)
+                if years < 2:
+                    difficulty_guidance = "Focus on fundamental concepts and basic problem-solving. Difficulty: Easy to Medium."
+                elif years < 5:
+                    difficulty_guidance = "Mix of intermediate technical questions and some system design. Difficulty: Medium to Hard."
+                else:
+                    difficulty_guidance = "Advanced technical depth, system design, and leadership scenarios. Difficulty: Hard."
+            except:
+                difficulty_guidance = "Mix of difficulty levels."
+        
+        prompt = f"""Generate {num_questions} personalized interview questions for a candidate.
+
+CANDIDATE PROFILE:
+{context}
+
+{difficulty_guidance}
+
+Generate questions that are:
+1. Relevant to the role and experience level
+2. Mix of technical, behavioral, and problem-solving
+3. Progressively challenging
+4. Realistic for actual interviews
+
+Respond with ONLY valid JSON in this format:
+{{
+  "questions": [
+    {{
+      "id": "q1",
+      "question": "<interview question text>",
+      "difficulty": "<Easy|Medium|Hard>",
+      "focus": "<Technical|Behavioral|System Design|Problem Solving>",
+      "topic": "<specific topic area>"
+    }}
+  ]
+}}"""
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 800
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        
+        if response.status_code != 200:
+            error_msg = f"Groq API error: {response.status_code}"
+            logger.error(f"{error_msg} - {response.text}")
+            return {"questions": [], "error": error_msg}
+        
+        result = response.json()
+        response_text = result["choices"][0]["message"]["content"].strip()
+        
+        # Clean up response
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        # Extract JSON
+        start_idx = response_text.find("{")
+        end_idx = response_text.rfind("}") + 1
+        
+        if start_idx != -1 and end_idx > start_idx:
+            json_str = response_text[start_idx:end_idx]
+            data = json.loads(json_str)
+        else:
+            data = json.loads(response_text)
+        
+        questions = data.get("questions", [])
+        logger.info(f"Generated {len(questions)} questions successfully")
+        
+        return {
+            "questions": questions,
+            "error": None
+        }
+    
+    except Exception as e:
+        logger.error(f"Question generation error: {str(e)}")
+        return {
+            "questions": [],
+            "error": f"Failed to generate questions: {str(e)}"
         }
 
 

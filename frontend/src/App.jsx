@@ -571,38 +571,54 @@ const AuthView = ({ onAuthComplete }) => (
   </div>
 );
 
-const ProfileSetupView = ({ onComplete }) => (
-  <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto w-full p-6 animate-fade-in-up">
-    <div className="text-center mb-8">
-      <h2 className="text-3xl font-bold text-white">Let's Personalize Interaura</h2>
-      <p className="text-slate-400 mt-2">Tell us about your goals to get tailored questions.</p>
-    </div>
-    <Card className="w-full space-y-6">
-      <div>
-        <label className="text-sm text-slate-400 mb-2 block">Target Job Role</label>
-        <Select icon={Briefcase} placeholder="Select Role" options={["Frontend Engineer", "Backend Engineer", "Product Manager", "Data Scientist", "UX Designer"]} />
-      </div>
-      <div>
-        <label className="text-sm text-slate-400 mb-2 block">Experience Level</label>
-        <Select icon={Award} placeholder="Select Level" options={["Intern / Junior", "Mid-Level", "Senior", "Staff / Principal"]} />
-      </div>
-      <div>
-        <label className="text-sm text-slate-400 mb-2 block">Primary Goal</label>
-        <Select icon={Target} placeholder="Select Goal" options={["Land a Job", "Build Confidence", "Practice Behavioral", "Mock Assessment"]} />
-      </div>
-      <div className="pt-4">
-        <Button className="w-full" onClick={onComplete} icon={CheckCircle}>Complete Setup</Button>
-      </div>
-    </Card>
-  </div>
-);
+const ProfileSetupView = ({ onComplete, onProfileUpdate }) => {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
+  const [experience, setExperience] = useState('');
+  const [salary, setSalary] = useState('');
 
-const DashboardView = ({ onNavigate }) => {
+  const handleComplete = () => {
+    onProfileUpdate({ name, role, experience, salary });
+    onComplete();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto w-full p-6 animate-fade-in-up">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-white">Let's Personalize Interaura</h2>
+        <p className="text-slate-400 mt-2">Tell us about yourself to get better feedback.</p>
+      </div>
+      <Card className="w-full space-y-6">
+        <div>
+          <label className="text-sm text-slate-400 mb-2 block">Your Name</label>
+          <Input icon={User} placeholder="Enter your name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm text-slate-400 mb-2 block">Target Job Role</label>
+          <Input icon={Briefcase} placeholder="e.g., Frontend Engineer" value={role} onChange={(e) => setRole(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm text-slate-400 mb-2 block">Years of Experience</label>
+          <Input icon={Award} placeholder="e.g., 2" value={experience} onChange={(e) => setExperience(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm text-slate-400 mb-2 block">Salary Expectation (Optional)</label>
+          <Input icon={Target} placeholder="e.g., $80,000" value={salary} onChange={(e) => setSalary(e.target.value)} />
+        </div>
+        <div className="pt-4">
+          <Button className="w-full" onClick={handleComplete} icon={CheckCircle}>Complete Setup</Button>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const DashboardView = ({ onNavigate, userProfile }) => {
   return (
     <div className="h-full p-6 max-w-7xl mx-auto overflow-y-auto custom-scrollbar animate-fade-in-up">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
         <div>
-          <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Hello, Alex</h2>
+          <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Hello, {userProfile?.name || 'User'}</h2>
           <p className="text-slate-400 mt-1 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Ready to crush your next interview?</p>
         </div>
         <div className="flex gap-3">
@@ -744,18 +760,137 @@ const ResumeInsightsView = ({ onContinue }) => (
   </div>
 );
 
-const InterviewSetupView = ({ onStart }) => (
-  <div className="flex flex-col items-center justify-center h-full p-6 animate-fade-in-up">
-    <h2 className="text-3xl font-bold text-white mb-8">Interview Setup</h2>
-    <Button onClick={onStart} icon={Play}>Start Session</Button>
-  </div>
-);
+const InterviewSetupView = ({ onStart, userProfile }) => {
+  const [questions, setQuestions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedQuestion, setSelectedQuestion] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        setIsLoading(true);
+        const formData = new FormData();
+        if (userProfile.role) formData.append('role', userProfile.role);
+        if (userProfile.experience) formData.append('experienceYears', userProfile.experience);
+        
+        const response = await fetch('http://localhost:8000/api/questions/generate', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+          setSelectedQuestion(data.questions[0]);
+        } else {
+          // Fallback to mock questions
+          setQuestions(MOCK_QUESTIONS);
+          setSelectedQuestion(MOCK_QUESTIONS[0]);
+          setError('Using default questions');
+        }
+      } catch (err) {
+        console.error('Failed to fetch questions:', err);
+        setError('Failed to load questions. Using defaults.');
+        // Fallback to mock questions
+        setQuestions(MOCK_QUESTIONS);
+        setSelectedQuestion(MOCK_QUESTIONS[0]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [userProfile]);
+
+  const handleStart = () => {
+    if (selectedQuestion && questions.length > 0) {
+      // Reorder questions to put selected one first
+      const reorderedQuestions = [
+        selectedQuestion,
+        ...questions.filter(q => q !== selectedQuestion)
+      ];
+      onStart(reorderedQuestions);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-6 animate-fade-in-up max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-white mb-2">Interview Setup</h2>
+      <p className="text-slate-400 mb-8">Select a question to practice</p>
+
+      {isLoading ? (
+        <Card className="w-full">
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+              <p className="text-slate-400">Generating personalized questions...</p>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {error && (
+            <div className="w-full mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 text-sm">
+              {error}
+            </div>
+          )}
+          
+          <div className="w-full space-y-4 mb-8">
+            {questions.map((q, idx) => (
+              <Card
+                key={idx}
+                onClick={() => setSelectedQuestion(q)}
+                className={`cursor-pointer transition-all ${
+                  selectedQuestion === q ? 'border-cyan-500 bg-cyan-500/5' : 'hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    selectedQuestion === q ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {selectedQuestion === q ? <Check size={16} /> : idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        q.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
+                        q.difficulty === 'Hard' ? 'bg-red-500/20 text-red-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {q.difficulty}
+                      </span>
+                      <span className="text-xs text-slate-500">{q.focus}</span>
+                    </div>
+                    <p className="text-white font-medium">{q.question}</p>
+                    {q.topic && (
+                      <p className="text-xs text-slate-500 mt-2">Topic: {q.topic}</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <Button onClick={handleStart} icon={Play} disabled={!selectedQuestion}>
+            Start Interview
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
 
 // --- ACTIVE INTERVIEW VIEW (WITH CHAT & MIC LOGIC) ---
-const ActiveInterviewView = ({ question, onEndQuestion }) => {
+const ActiveInterviewView = ({ question, nextQuestion, onEndQuestion, userProfile }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [messages, setMessages] = useState([{ role: 'ai', text: question.text }]);
+  const [messages, setMessages] = useState([{ role: 'ai', text: question.question || question.text || "No question available" }]);
   const [timer, setTimer] = useState(0);
   const timerRef = useRef(null);
 
@@ -797,8 +932,14 @@ const ActiveInterviewView = ({ question, onEndQuestion }) => {
 
         const formData = new FormData();
         formData.append("file", videoBlob, "recording.webm");
-        formData.append("questionId", question.id);
-        formData.append("role", "candidate");
+        formData.append("questionId", question.id || "dynamic");
+        formData.append("question", question.question || question.text || ""); // Send actual question text
+        formData.append("role", userProfile.role || "candidate");
+        
+        // Add user profile data for enhanced evaluation
+        if (userProfile.name) formData.append("candidateName", userProfile.name);
+        if (userProfile.experience) formData.append("experienceYears", userProfile.experience);
+        if (userProfile.salary) formData.append("salaryExpectation", userProfile.salary);
 
         try {
           const response = await fetch("http://localhost:8000/api/analyze", {
@@ -812,7 +953,11 @@ const ActiveInterviewView = ({ question, onEndQuestion }) => {
           setMessages(prev => [...prev, { role: 'user', text: data.transcript || "(No speech detected)" }]);
 
           setTimeout(() => {
-            setMessages(prev => [...prev, { role: 'ai', text: "Thank you. Click Next to see your analysis." }]);
+            const nextQuestionText = nextQuestion ? (nextQuestion.question || nextQuestion.text) : null;
+            const message = nextQuestionText 
+              ? `Great! Here's your next question:\n\n${nextQuestionText}\n\nClick Next when you're ready to see your analysis and continue.`
+              : "Thank you! That was the last question. Click Next to see your final analysis.";
+            setMessages(prev => [...prev, { role: 'ai', text: message }]);
           }, 1000);
 
           lastResultRef.current = data;
@@ -942,89 +1087,242 @@ const ActiveInterviewView = ({ question, onEndQuestion }) => {
   );
 };
 
-const InstantFeedbackView = ({ onNext, data }) => {
+const InstantFeedbackView = ({ onNext, data, nextQuestion }) => {
   // Parsing Data with Fallbacks
   const transcript = data?.transcript || "No speech detected.";
   const overallScore = data?.overallScore || 0;
 
-  // Scores
+  // Scores - check both 'content' and 'evaluation' keys for compatibility
   const visualScore = data?.visual ? Math.round((data.visual.eyeContact + data.visual.posture) / 2) : 0;
-  const contentScore = data?.content?.score || 0;
+  const contentData = data?.content || data?.evaluation || {};
+  const contentScore = contentData.score ? Math.round(contentData.score * 10) : 0; // Convert 1-10 to percentage
   const speechScore = data?.speechScore || 0;
 
   // Metrics
   const wpm = data?.speech?.wordsPerMinute || 0;
   const fillerCount = data?.speech?.fillerCount || 0;
   const eyeContact = data?.visual?.eyeContact || 0;
-  const contentFeedback = data?.content?.feedback || "Keep practicing!";
+  const posture = data?.visual?.posture || 0;
+  
+  // Enhanced feedback from LLM
+  const contentFeedback = contentData.feedback || contentData.reasoning || "Keep practicing!";
+  const confidenceAssessment = contentData.confidence_assessment || "";
+  const communicationQuality = contentData.communication_quality || "";
 
   return (
-    <div className="flex flex-col h-full p-6 animate-fade-in-up overflow-y-auto custom-scrollbar">
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <h2 className="text-3xl font-bold text-white">Analysis Results</h2>
-          <p className="text-slate-400">Here's how you performed.</p>
+    <div className="flex h-full animate-fade-in-up">
+      {/* Left Sidebar - Compact Metrics */}
+      <div className="w-80 border-r border-slate-800 p-6 flex flex-col bg-slate-900/30 overflow-y-auto custom-scrollbar">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white mb-1">Analysis Results</h2>
+          <p className="text-slate-400 text-sm">Performance breakdown</p>
         </div>
-        <div className="text-right">
-          <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">{overallScore}</div>
-          <div className="text-sm font-bold text-slate-500 uppercase tracking-wider">Overall Score</div>
+
+        {/* Overall Score */}
+        <div className="mb-6 p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl border border-cyan-500/30">
+          <div className="text-center">
+            <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-1">{overallScore}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Overall Score</div>
+          </div>
         </div>
+
+        {/* Compact Metric Cards */}
+        <div className="space-y-3 mb-6">
+          {/* Visual */}
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Eye size={14} className="text-cyan-400" />
+                <span className="text-xs font-bold text-slate-300 uppercase">Visual</span>
+              </div>
+              <span className={`text-lg font-bold ${visualScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{visualScore}%</span>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                  <span>Eye Contact</span>
+                  <span>{eyeContact}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                  <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${eyeContact}%` }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                  <span>Posture</span>
+                  <span>{posture}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                  <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${posture}%` }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-purple-400" />
+                <span className="text-xs font-bold text-slate-300 uppercase">Content</span>
+              </div>
+              <span className={`text-lg font-bold ${contentScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{contentScore}%</span>
+            </div>
+          </div>
+
+          {/* Speech */}
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Mic size={14} className="text-green-400" />
+                <span className="text-xs font-bold text-slate-300 uppercase">Speech</span>
+              </div>
+              <span className={`text-lg font-bold ${speechScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{speechScore.toFixed(0)}%</span>
+            </div>
+            <div className="flex justify-around">
+              <div className="text-center">
+                <div className="text-base font-bold text-white">{wpm}</div>
+                <div className="text-[9px] text-slate-500 uppercase">WPM</div>
+              </div>
+              <div className="h-8 w-[1px] bg-slate-700"></div>
+              <div className="text-center">
+                <div className={`text-base font-bold ${fillerCount > 3 ? 'text-red-400' : 'text-green-400'}`}>{fillerCount}</div>
+                <div className="text-[9px] text-slate-500 uppercase">Fillers</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Next Question Preview */}
+        {nextQuestion && (
+          <div className="mt-auto pt-4 border-t border-slate-700">
+            <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Next Question</p>
+            <p className="text-sm text-slate-300 leading-snug">{nextQuestion.question || nextQuestion.text}</p>
+            <Button onClick={onNext} icon={ArrowRight} className="w-full mt-3" variant="primary">
+              Continue
+            </Button>
+          </div>
+        )}
+        {!nextQuestion && (
+          <Button onClick={onNext} icon={CheckCircle} className="w-full mt-auto" variant="success">
+            Complete Interview
+          </Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mb-8">
-        {/* Visual Card */}
-        <Card>
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-slate-400 text-sm font-bold uppercase"><Eye size={16} className="inline mr-2" /> Visual Confidence</h3>
-            <span className={`text-xl font-bold ${visualScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{visualScore}%</span>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Eye Contact</span><span>{eyeContact}%</span></div>
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-cyan-500" style={{ width: `${eyeContact}%` }}></div></div>
+      {/* Right Side - Expanded AI Analysis */}
+      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+        {/* AI Evaluation */}
+        <Card className="mb-6">
+          <h3 className="text-slate-300 text-xl font-bold mb-4 flex items-center gap-2">
+            <Brain size={24} className="text-cyan-400" />
+            AI Evaluation
+          </h3>
+          <p className="text-slate-200 text-base leading-relaxed mb-4 italic">"{contentFeedback}"</p>
+          {confidenceAssessment && (
+            <div className="p-3 bg-slate-800/30 rounded-lg mb-2">
+              <p className="text-xs text-slate-400"><strong className="text-cyan-400">Confidence:</strong> {confidenceAssessment}</p>
             </div>
-            <p className="text-xs text-slate-400 leading-snug">Maintains steady gaze vs looking away.</p>
-          </div>
+          )}
+          {communicationQuality && (
+            <div className="p-3 bg-slate-800/30 rounded-lg">
+              <p className="text-xs text-slate-400"><strong className="text-purple-400">Communication:</strong> {communicationQuality}</p>
+            </div>
+          )}
         </Card>
 
-        {/* Content Card */}
-        <Card>
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-slate-400 text-sm font-bold uppercase"><FileText size={16} className="inline mr-2" /> Content Quality</h3>
-            <span className={`text-xl font-bold ${contentScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{contentScore}%</span>
-          </div>
-          <p className="text-sm text-slate-300 italic mb-2">"{contentFeedback}"</p>
-        </Card>
-
-        {/* Speech Card */}
-        <Card>
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-slate-400 text-sm font-bold uppercase"><Mic size={16} className="inline mr-2" /> Speech Delivery</h3>
-            <span className={`text-xl font-bold ${speechScore > 70 ? 'text-green-400' : 'text-orange-400'}`}>{speechScore}%</span>
-          </div>
-          <div className="flex justify-between items-center mb-2">
-            <div className="text-center">
-              <div className="text-xl font-bold text-white">{wpm}</div>
-              <div className="text-[10px] text-slate-500 uppercase">WPM</div>
+        {/* Enhanced AI Suggestions Section */}
+        {contentData.suggestions && contentData.suggestions.length > 0 && (
+          <Card className="mb-6">
+            <h3 className="text-slate-300 text-xl font-bold mb-4 flex items-center gap-2">
+              <Target size={24} className="text-green-400" />
+              Specific Improvements
+            </h3>
+            <div className="space-y-4">
+              {contentData.suggestions.map((suggestion, idx) => {
+                const isEnhanced = typeof suggestion === 'object';
+                const improvement = isEnhanced ? suggestion.improvement : suggestion;
+                const context = isEnhanced ? suggestion.context : null;
+                const betterApproach = isEnhanced ? suggestion.better_approach : null;
+                
+                return (
+                  <div key={idx} className="p-4 bg-slate-800/30 rounded-xl border border-slate-700/30 hover:border-cyan-500/30 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-cyan-400 text-sm font-bold">{idx + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium mb-3 text-base">{improvement}</p>
+                        {context && context !== 'General' && (
+                          <div className="mb-3 p-3 bg-slate-900/50 rounded border-l-2 border-cyan-500/50">
+                            <p className="text-xs text-slate-400 mb-1">In your response:</p>
+                            <p className="text-sm text-slate-300 italic">"{context}"</p>
+                          </div>
+                        )}
+                        {betterApproach && (
+                          <div className="p-3 bg-green-500/10 rounded border-l-2 border-green-500/50">
+                            <p className="text-xs text-green-400 mb-1 font-semibold">Better approach:</p>
+                            <p className="text-sm text-slate-200">{betterApproach}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="h-8 w-[1px] bg-slate-800"></div>
-            <div className="text-center">
-              <div className={`text-xl font-bold ${fillerCount > 3 ? 'text-red-400' : 'text-green-400'}`}>{fillerCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase">Fillers</div>
+          </Card>
+        )}
+
+        {/* Behavioral Insights Section */}
+        {contentData.behavioral_insights && (
+          <Card className="mb-6">
+            <h3 className="text-slate-300 text-xl font-bold mb-4 flex items-center gap-2">
+              <Activity size={24} className="text-purple-400" />
+              Behavioral Insights
+            </h3>
+            <div className="space-y-3">
+              {contentData.behavioral_insights.eye_contact_analysis && (
+                <div className="p-4 bg-slate-800/20 rounded-lg border border-slate-700/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye size={18} className="text-cyan-400" />
+                    <h4 className="text-sm font-bold text-slate-200">Eye Contact Pattern</h4>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed">{contentData.behavioral_insights.eye_contact_analysis}</p>
+                </div>
+              )}
+              {contentData.behavioral_insights.filler_word_impact && (
+                <div className="p-4 bg-slate-800/20 rounded-lg border border-slate-700/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Volume size={18} className="text-orange-400" />
+                    <h4 className="text-sm font-bold text-slate-200">Filler Word Analysis</h4>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed">{contentData.behavioral_insights.filler_word_impact}</p>
+                </div>
+              )}
+              {contentData.behavioral_insights.speech_pace_feedback && (
+                <div className="p-4 bg-slate-800/20 rounded-lg border border-slate-700/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageSquare size={18} className="text-green-400" />
+                    <h4 className="text-sm font-bold text-slate-200">Speech Pace</h4>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed">{contentData.behavioral_insights.speech_pace_feedback}</p>
+                </div>
+              )}
             </div>
-          </div>
+          </Card>
+        )}
+
+        {/* Transcript */}
+        <Card>
+          <h3 className="text-slate-300 text-lg font-bold mb-3 flex items-center gap-2">
+            <FileText size={20} className="text-slate-400" />
+            Your Response
+          </h3>
+          <p className="text-slate-200 text-base leading-relaxed p-4 bg-slate-900/30 rounded-xl">
+            "{transcript}"
+          </p>
         </Card>
-      </div>
-
-      <Card className="flex-1 mb-6">
-        <h3 className="text-slate-400 text-sm font-bold uppercase mb-2">Transcript</h3>
-        <p className="text-slate-200 text-lg leading-relaxed h-full overflow-y-auto custom-scrollbar p-2 bg-slate-900/30 rounded-xl">
-          "{transcript}"
-        </p>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button onClick={onNext} icon={ArrowRight}>Next Question</Button>
       </div>
     </div>
   );
@@ -1054,20 +1352,33 @@ const Sidebar = ({ setView }) => (
 const App = () => {
   const [view, setView] = useState('landing');
   const [qIndex, setQIndex] = useState(0);
-
   const [feedbackData, setFeedbackData] = useState(null);
+  const [selectedQuestions, setSelectedQuestions] = useState(MOCK_QUESTIONS);
+  const [userProfile, setUserProfile] = useState({
+    name: '',
+    role: '',
+    experience: '',
+    salary: ''
+  });
 
   const handleAuthComplete = () => setView('profile-setup');
   const handleProfileComplete = () => setView('dashboard');
+  const handleProfileUpdate = (profile) => setUserProfile(profile);
   const handleResumeUploaded = () => setView('resume-insights');
-  const handleBeginInterview = () => { setQIndex(0); setView('interview-active'); };
+  const handleBeginInterview = (questions) => { 
+    if (questions && questions.length > 0) {
+      setSelectedQuestions(questions);
+    }
+    setQIndex(0); 
+    setView('interview-active'); 
+  };
 
   const handleQuestionDone = (data) => {
     setFeedbackData(data);
     setView('interview-feedback');
   };
   const handleNextQuestion = () => {
-    if (qIndex < MOCK_QUESTIONS.length - 1) {
+    if (qIndex < selectedQuestions.length - 1) {
       setQIndex(prev => prev + 1);
       setView('interview-active');
     } else {
@@ -1085,13 +1396,13 @@ const App = () => {
         <div className="relative z-10 h-full">
           {view === 'landing' && <LandingView onStart={() => setView('auth')} />}
           {view === 'auth' && <AuthView onAuthComplete={handleAuthComplete} />}
-          {view === 'profile-setup' && <ProfileSetupView onComplete={handleProfileComplete} />}
-          {view === 'dashboard' && <DashboardView onNavigate={setView} />}
+          {view === 'profile-setup' && <ProfileSetupView onComplete={handleProfileComplete} onProfileUpdate={handleProfileUpdate} />}
+          {view === 'dashboard' && <DashboardView onNavigate={setView} userProfile={userProfile} />}
           {view === 'resume-upload' && <ResumeUploadView onUpload={handleResumeUploaded} />}
           {view === 'resume-insights' && <ResumeInsightsView onContinue={() => setView('dashboard')} />}
-          {view === 'interview-setup' && <InterviewSetupView onStart={handleBeginInterview} />}
-          {view === 'interview-active' && <ActiveInterviewView question={MOCK_QUESTIONS[qIndex]} onEndQuestion={handleQuestionDone} />}
-          {view === 'interview-feedback' && <InstantFeedbackView onNext={handleNextQuestion} data={feedbackData} />}
+          {view === 'interview-setup' && <InterviewSetupView onStart={handleBeginInterview} userProfile={userProfile} />}
+          {view === 'interview-active' && <ActiveInterviewView question={selectedQuestions[qIndex]} nextQuestion={qIndex < selectedQuestions.length - 1 ? selectedQuestions[qIndex + 1] : null} onEndQuestion={handleQuestionDone} userProfile={userProfile} />}
+          {view === 'interview-feedback' && <InstantFeedbackView onNext={handleNextQuestion} data={feedbackData} nextQuestion={qIndex < selectedQuestions.length - 1 ? selectedQuestions[qIndex + 1] : null} />}
           {view === 'post-interview' && <PostInterviewView onHome={() => setView('dashboard')} />}
           {view === 'resources' && <PracticeHubView />}
           {view === 'progress' && <ProgressView />}
