@@ -1930,11 +1930,148 @@ const InstantFeedbackView = ({ onNext, data, nextQuestion }) => {
 };
 
 const PracticeHubView = () => (
-  <div className="h-full p-6 animate-fade-in-up"><h2 className="text-3xl font-bold text-white">Practice Hub</h2></div>
+  <div className="h-full p-6 overflow-y-auto custom-scrollbar animate-fade-in-up">
+    <div className="max-w-6xl mx-auto">
+      <h2 className="text-4xl font-black text-white mb-2">Practice Hub</h2>
+      <p className="text-slate-400 mb-8">Master your interview skills with targeted practice sessions</p>
+      
+      {/* Practice Categories */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+        {[
+          { title: 'Technical Questions', count: 150, icon: Code, color: 'from-cyan-500 to-blue-500', desc: 'Data structures, algorithms, system design' },
+          { title: 'Behavioral Questions', count: 75, icon: MessageSquare, color: 'from-purple-500 to-pink-500', desc: 'STAR method, leadership, teamwork' },
+          { title: 'System Design', count: 40, icon: Layers, color: 'from-orange-500 to-red-500', desc: 'Architecture, scalability, databases' },
+        ].map((cat, i) => (
+          <div key={i} className="p-6 rounded-3xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 hover:border-slate-600 transition-all cursor-pointer group">
+            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+              <cat.icon size={28} className="text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-1">{cat.title}</h3>
+            <p className="text-slate-400 text-sm mb-3">{cat.desc}</p>
+            <div className="flex items-center justify-between">
+              <span className="text-cyan-400 font-bold">{cat.count} Questions</span>
+              <ArrowRight size={18} className="text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Practice */}
+      <h3 className="text-xl font-bold text-white mb-4">Quick Practice</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        {[
+          { title: '5-Minute Warmup', time: '5 min', questions: 3, difficulty: 'Easy' },
+          { title: 'Full Interview Simulation', time: '45 min', questions: 8, difficulty: 'Mixed' },
+          { title: 'Algorithm Sprint', time: '15 min', questions: 5, difficulty: 'Hard' },
+          { title: 'Behavioral Deep Dive', time: '20 min', questions: 4, difficulty: 'Medium' },
+        ].map((session, i) => (
+          <div key={i} className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-between group">
+            <div>
+              <h4 className="font-bold text-white">{session.title}</h4>
+              <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
+                <span className="flex items-center gap-1"><Clock size={14} /> {session.time}</span>
+                <span>{session.questions} Qs</span>
+                <span className={`px-2 py-0.5 rounded ${session.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' : session.difficulty === 'Hard' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{session.difficulty}</span>
+              </div>
+            </div>
+            <Play size={24} className="text-slate-500 group-hover:text-cyan-400 transition-colors" />
+          </div>
+        ))}
+      </div>
+
+      {/* Tips Section */}
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Star className="text-yellow-400" /> Pro Tips</h3>
+        <ul className="space-y-2 text-slate-300 text-sm">
+          <li className="flex items-start gap-2"><CheckCircle size={16} className="text-green-400 mt-0.5 flex-shrink-0" /> Practice speaking out loud to improve verbal fluency</li>
+          <li className="flex items-start gap-2"><CheckCircle size={16} className="text-green-400 mt-0.5 flex-shrink-0" /> Use STAR method for behavioral questions (Situation, Task, Action, Result)</li>
+          <li className="flex items-start gap-2"><CheckCircle size={16} className="text-green-400 mt-0.5 flex-shrink-0" /> Record yourself to analyze body language and speaking pace</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 );
 
 const ProgressView = () => (
-  <div className="h-full p-6 animate-fade-in-up"><h2 className="text-3xl font-bold text-white">Progress</h2></div>
+  <div className="h-full p-6 overflow-y-auto custom-scrollbar animate-fade-in-up">
+    <div className="max-w-6xl mx-auto">
+      <h2 className="text-4xl font-black text-white mb-2">Your Progress</h2>
+      <p className="text-slate-400 mb-8">Track your interview preparation journey</p>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        {[
+          { label: 'Total Sessions', value: '0', icon: Play, color: 'text-cyan-400' },
+          { label: 'Avg Score', value: '0%', icon: Target, color: 'text-purple-400' },
+          { label: 'Practice Time', value: '0h', icon: Clock, color: 'text-green-400' },
+          { label: 'Questions Answered', value: '0', icon: MessageSquare, color: 'text-orange-400' },
+        ].map((stat, i) => (
+          <div key={i} className="p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 text-center">
+            <stat.icon size={24} className={`${stat.color} mx-auto mb-2`} />
+            <div className="text-3xl font-black text-white">{stat.value}</div>
+            <div className="text-xs text-slate-400">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Performance Chart Placeholder */}
+      <div className="mb-10">
+        <h3 className="text-xl font-bold text-white mb-4">Performance Trend</h3>
+        <div className="p-8 rounded-3xl bg-slate-800/50 border border-slate-700/50 flex flex-col items-center justify-center min-h-[200px]">
+          <BarChart size={48} className="text-slate-600 mb-4" />
+          <p className="text-slate-500 text-center">Complete your first interview to see performance analytics</p>
+          <p className="text-slate-600 text-sm mt-2">Charts will show your progress over time</p>
+        </div>
+      </div>
+
+      {/* Skill Radar Placeholder */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className="p-6 rounded-3xl bg-slate-800/50 border border-slate-700/50">
+          <h3 className="text-lg font-bold text-white mb-4">Skill Breakdown</h3>
+          <div className="space-y-4">
+            {['Technical Knowledge', 'Communication', 'Problem Solving', 'System Design', 'Behavioral'].map((skill, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-slate-400">{skill}</span>
+                  <span className="text-slate-500">0%</span>
+                </div>
+                <div className="h-2 bg-slate-700 rounded-full">
+                  <div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full" style={{ width: '0%' }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-6 rounded-3xl bg-slate-800/50 border border-slate-700/50">
+          <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
+          <div className="flex flex-col items-center justify-center h-40 text-center">
+            <Activity size={40} className="text-slate-600 mb-3" />
+            <p className="text-slate-500">No activity yet</p>
+            <p className="text-slate-600 text-sm">Start practicing to track your progress</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Achievement Badges */}
+      <h3 className="text-xl font-bold text-white mb-4">Achievements</h3>
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+        {[
+          { name: 'First Steps', icon: Play, locked: true },
+          { name: 'Streak Master', icon: Flame, locked: true },
+          { name: 'Perfect Score', icon: Star, locked: true },
+          { name: 'Speed Demon', icon: Zap, locked: true },
+          { name: 'Consistent', icon: Target, locked: true },
+          { name: 'Champion', icon: Award, locked: true },
+        ].map((badge, i) => (
+          <div key={i} className={`p-4 rounded-2xl border text-center ${badge.locked ? 'bg-slate-800/30 border-slate-700/30 opacity-50' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+            <badge.icon size={28} className={badge.locked ? 'text-slate-600 mx-auto mb-2' : 'text-yellow-400 mx-auto mb-2'} />
+            <p className="text-xs text-slate-500">{badge.name}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 );
 
 const Sidebar = ({ setView }) => (
@@ -1942,10 +2079,23 @@ const Sidebar = ({ setView }) => (
     <div className="text-xl font-bold text-white mb-10 flex items-center gap-2">
       <Zap className="text-cyan-400" size={24} fill="currentColor" /> INTERAURA
     </div>
-    <div className="space-y-2">
+    <div className="space-y-2 flex-1">
       <button onClick={() => setView('dashboard')} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 text-white flex gap-3 items-center font-medium border border-white/5"><LayoutGrid size={20} /> Dashboard</button>
       <button onClick={() => setView('resources')} className="w-full text-left px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 flex gap-3 items-center transition-all"><BookOpen size={20} /> Practice</button>
       <button onClick={() => setView('progress')} className="w-full text-left px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 flex gap-3 items-center transition-all"><TrendingUp size={20} /> Progress</button>
+    </div>
+    
+    {/* GitHub Link */}
+    <div className="pt-6 mt-auto border-t border-slate-800">
+      <a 
+        href="https://github.com/aaswani-v/ai-mock-interview" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all group"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        <span className="text-sm font-medium group-hover:underline">View on GitHub</span>
+      </a>
     </div>
   </div>
 );
