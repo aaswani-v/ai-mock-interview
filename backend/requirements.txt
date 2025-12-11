@@ -19,3 +19,7 @@ bcrypt
 PyPDF2
 python-docx
 pdfplumber
+
+# ATS Analysis
+google-generativeai
+scikit-learn
