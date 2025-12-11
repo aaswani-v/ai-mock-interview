@@ -62,18 +62,18 @@ graph TB
         end
         
         subgraph Intelligence ["🧠 Language Intelligence"]
-            Groq[Groq Llama 3.1<br/>Ultra-low Latency<br/>Question Generation<br/>Answer Evaluation]
-            Gemini[Gemini 1.5 Flash<br/>Resume Semantic Matching]
+            Groq[Groq Llama 3<br/>Ultra-low Latency<br/>Question Generation<br/>Answer Evaluation<br/>Content Analysis]
         end
     end
 
     subgraph DataLayer ["💾 DATA & AUTH LAYER"]
         direction TB
-        Supabase[Supabase (PostgreSQL)<br/>🔐 Authentication<br/>📁 Row Level Security<br/>☁️ Data Storage]
+        Firebase[Firebase<br/>🔐 Authentication<br/>📁 Firestore DB<br/>☁️ Cloud Storage]
+        Cache[Redis Cache<br/>⚡ Session State<br/>🎯 Hot Data]
     end
 
     subgraph Processing ["⚙️ BACKGROUND JOBS"]
-        Celery[Celery Workers<br/>📄 Report Generation<br/>📊 Async Processing]
+        Celery[Celery Workers<br/>📄 Resume Parsing<br/>📊 Report Generation<br/>📧 Email Notifications]
         Queue[(Message Queue<br/>RabbitMQ/Redis)]
     end
 
@@ -102,12 +102,13 @@ graph TB
 
     class UI,Style,Charts,WebRTC frontend
     class FastAPI backend
-    class OpenCV,Deepgram,Groq,Gemini ai
-    class Supabase data
+    class OpenCV,Deepgram,Groq ai
+    class Firebase,Cache data
     class Celery,Queue process
 
     linkStyle default stroke:#a855f7,stroke-width:2px
 ```
+
 
 ### 🛠️ Stack Breakdown
 
