@@ -20,6 +20,10 @@ dist/
 .env.local
 .env.production
 
+# Firebase credentials (NEVER commit!)
+firebase-credentials.json
+*.json
+
 # Test files and samples
 samples/*.mp4
 samples/*.webm

@@ -35,6 +35,13 @@ from groq_deepgram_client import (
     test_deepgram_connection
 )
 
+# Import Supabase database
+from supabase_db import initialize_supabase, UserDB, ResumeDB, InterviewDB
+
+# Import resume parser
+import PyPDF2
+import pdfplumber
+
 # Load questions database
 QUESTIONS = {}
 questions_path = Path(__file__).parent / "questions.json"
@@ -196,6 +203,228 @@ def health_check():
         }
     }
 
+
+# Initialize Supabase on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Supabase connection on app startup"""
+    if initialize_supabase():
+        logger.info("✅ Supabase initialized successfully")
+    else:
+        logger.warning("⚠️ Supabase initialization failed - auth features will not work")
+
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/auth/signup")
+async def signup(
+    email: str = Form(...),
+    password: str = Form(...),
+    name: str = Form(...)
+):
+    """
+    Create a new user account
+    
+    Args:
+        email: User email
+        password: User password (min 6 characters)
+        name: User's full name
+        
+    Returns:
+        User data and session token
+    """
+    try:
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        user = UserDB.create_user(email=email, password=password, name=name)
+        
+        if not user:
+            raise HTTPException(status_code=400, detail="Email already exists or signup failed")
+        
+        return {
+            "success": True,
+            "user": {
+                "uid": user["uid"],
+                "email": user["email"],
+                "name": user["name"]
+            },
+            "session": user.get("session")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Signup failed")
+
+
+@app.post("/api/auth/login")
+async def login(
+    email: str = Form(...),
+    password: str = Form(...)
+):
+    """
+    Login user
+    
+    Args:
+        email: User email
+        password: User password
+        
+    Returns:
+        User data and session token
+    """
+    try:
+        user = UserDB.login_user(email=email, password=password)
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Get full user profile
+        profile = UserDB.get_user(user["uid"])
+        
+        return {
+            "success": True,
+            "user": {
+                "uid": user["uid"],
+                "email": user["email"],
+                "profile": profile
+            },
+            "session": user.get("session")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+
+@app.post("/api/auth/logout")
+async def logout():
+    """Logout user (client-side token removal)"""
+    return {"success": True, "message": "Logged out successfully"}
+
+
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    """Get user profile"""
+    try:
+        profile = UserDB.get_user(user_id)
+        
+        if not profile:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"success": True, "profile": profile}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get profile error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get profile")
+
+
+@app.post("/api/profile/update")
+async def update_profile(
+    user_id: str = Form(...),
+    name: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    role: Optional[str] = Form(None),
+    experience_years: Optional[str] = Form(None, alias="experienceYears"),
+    salary_expectation: Optional[str] = Form(None, alias="salaryExpectation"),
+    currency: Optional[str] = Form("USD")
+):
+    """Update user profile"""
+    try:
+        profile_data = {}
+        if name: profile_data["name"] = name
+        if phone: profile_data["phone"] = phone
+        if role: profile_data["role"] = role
+        if experience_years: profile_data["experience_years"] = experience_years
+        if salary_expectation: profile_data["salary_expectation"] = salary_expectation
+        if currency: profile_data["currency"] = currency
+        
+        success = UserDB.update_profile(user_id, profile_data)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update profile")
+        
+        return {"success": True, "message": "Profile updated successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update profile error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")
+
+
+# ============================================================================
+# RESUME ENDPOINTS
+# ============================================================================
+
+@app.post("/api/resume/upload")
+async def upload_resume(
+    file: UploadFile = File(...),
+    user_id: str = Form(...)
+):
+    """Upload and parse resume"""
+    try:
+        # Validate file type
+        if not file.filename.endswith(('.pdf', '.PDF')):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        # Save file
+        file_path = f"uploads/{user_id}_{file.filename}"
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+        
+        # Parse resume
+        parsed_data = {}
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+                
+                # Extract basic info
+                import re
+                
+                # Email
+                email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
+                parsed_data['email'] = email_match.group(0) if email_match else None
+                
+                # Phone
+                phone_match = re.search(r'\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
+                parsed_data['phone'] = phone_match.group(0) if phone_match else None
+                
+                # Skills (simple keyword matching)
+                skills_keywords = ['python', 'java', 'javascript', 'react', 'node', 'sql', 'aws', 'docker']
+                parsed_data['skills'] = [skill for skill in skills_keywords if skill.lower() in text.lower()]
+                
+                # Raw text for LLM
+                parsed_data['raw_text'] = text[:2000]  # First 2000 chars
+                
+        except Exception as e:
+            logger.error(f"Error parsing PDF: {str(e)}")
+            parsed_data['error'] = str(e)
+        
+        # Save to Supabase
+        ResumeDB.save_resume(user_id, file_path, parsed_data)
+        
+        return {"success": True, "data": parsed_data}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Resume upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload resume")
+
+
+# ============================================================================
+# INTERVIEW ENDPOINTS
+# ============================================================================
 
 @app.post("/api/questions/generate")
 @limiter.limit(RATE_LIMIT)

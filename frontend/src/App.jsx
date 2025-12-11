@@ -327,6 +327,231 @@ const AutoChecklist = () => {
   );
 };
 
+// ============================================================================
+// AUTHENTICATION VIEWS
+// ============================================================================
+
+const LoginView = ({ onLogin, onSignupClick }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    const result = await onLogin(email, password);
+    setLoading(false);
+
+    if (!result.success) {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 animate-fade-in-up relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] animate-float-slow"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px] animate-float-delayed"></div>
+      </div>
+
+      <div className="w-full max-w-md bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative z-50">
+        <div className="p-10">
+          <div className="w-12 h-12 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30 mb-6">
+            <Zap size={24} className="text-white" />
+          </div>
+          <h2 className="text-4xl font-bold text-white mb-2">Welcome Back</h2>
+          <p className="text-slate-400 mb-8">Continue your journey to interview mastery.</p>
+
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl mb-6">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</label>
+              <Input icon={Mail} type="email" placeholder="example@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Password</label>
+              <Input icon={Lock} type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+
+            <Button onClick={handleSubmit} variant="primary" className="w-full mt-4" disabled={loading}>
+              {loading ? <RefreshCw className="animate-spin" size={20} /> : "Login"}
+            </Button>
+
+            <div className="text-center mt-6">
+              <p className="text-slate-400 text-sm mb-3">Don't have an account?</p>
+              <button
+                onClick={onSignupClick}
+                className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition-colors"
+              >
+                Create Account →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SignupView = ({ onSignup, onLoginClick }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!email || !password || !name) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    const result = await onSignup(email, password, name);
+    setLoading(false);
+
+    if (!result.success) {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 animate-fade-in-up relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] animate-float-slow"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px] animate-float-delayed"></div>
+      </div>
+
+      <div className="w-full max-w-md bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative z-50">
+        <div className="p-10">
+          <div className="w-12 h-12 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30 mb-6">
+            <Zap size={24} className="text-white" />
+          </div>
+          <h2 className="text-4xl font-bold text-white mb-2">Create Account</h2>
+          <p className="text-slate-400 mb-8">Start your interview preparation journey.</p>
+
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl mb-6">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Name</label>
+              <Input icon={User} type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</label>
+              <Input icon={Mail} type="email" placeholder="example@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Password</label>
+              <Input icon={Lock} type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+
+            <Button onClick={handleSubmit} variant="primary" className="w-full mt-4" disabled={loading}>
+              {loading ? <RefreshCw className="animate-spin" size={20} /> : "Sign Up"}
+            </Button>
+
+            <div className="text-center mt-6">
+              <p className="text-slate-400 text-sm mb-3">Already have an account?</p>
+              <button
+                onClick={onLoginClick}
+                className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition-colors"
+              >
+                Login →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AuthView = ({ onAuthComplete }) => {
+  const [isLogin, setIsLogin] = useState(true);
+
+  const handleLogin = async (email, password) => {
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+
+      const response = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('session', JSON.stringify(data.session));
+        onAuthComplete(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: data.detail || 'Invalid credentials' };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const handleSignup = async (email, password, name) => {
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('name', name);
+
+      const response = await fetch('http://localhost:8000/api/auth/signup', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return await handleLogin(email, password);
+      } else {
+        return { success: false, error: data.detail || 'Signup failed' };
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  if (isLogin) {
+    return <LoginView onLogin={handleLogin} onSignupClick={() => setIsLogin(false)} />;
+  } else {
+    return <SignupView onSignup={handleSignup} onLoginClick={() => setIsLogin(true)} />;
+  }
+};
+
 const TiltCard = ({ children, className }) => {
   const cardRef = useRef(null);
   const [glowPos, setGlowPos] = useState({ x: 0, y: 0 });
@@ -551,25 +776,6 @@ const LandingView = ({ onStart }) => {
     </div>
   );
 };
-
-const AuthView = ({ onAuthComplete }) => (
-  <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto w-full p-6 animate-fade-in-up">
-    <div className="text-center mb-8">
-      <div className="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-cyan-500/30">
-        <Zap size={32} className="text-white" />
-      </div>
-      <h2 className="text-3xl font-bold text-white">Welcome Back</h2>
-      <p className="text-slate-400 mt-2">Log in to your Interaura account.</p>
-    </div>
-    <Card className="w-full" glow>
-      <div className="space-y-4">
-        <Input icon={Mail} type="email" placeholder="Email Address" />
-        <Input icon={Lock} type="password" placeholder="Password" />
-        <Button className="w-full mt-6" onClick={onAuthComplete}>Sign In</Button>
-      </div>
-    </Card>
-  </div>
-);
 
 const ProfileSetupView = ({ onComplete, onProfileUpdate }) => {
   const [name, setName] = useState('');
@@ -1377,9 +1583,12 @@ const App = () => {
     setFeedbackData(data);
     setView('interview-feedback');
   };
+  
   const handleNextQuestion = () => {
-    if (qIndex < selectedQuestions.length - 1) {
-      setQIndex(prev => prev + 1);
+    // Move to next question
+    const nextIndex = qIndex + 1;
+    if (nextIndex < selectedQuestions.length) {
+      setQIndex(nextIndex);
       setView('interview-active');
     } else {
       setView('post-interview');
