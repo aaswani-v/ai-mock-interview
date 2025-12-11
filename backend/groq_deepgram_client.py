@@ -337,7 +337,8 @@ def generate_dynamic_questions(
     role: str,
     experience_years: Optional[str] = None,
     skills: Optional[list] = None,
-    num_questions: int = 3
+    num_questions: int = 3,
+    difficulty: Optional[str] = None  # 'beginner', 'intermediate', 'advanced'
 ) -> dict:
     """
     Generate personalized interview questions using Groq API.
@@ -347,6 +348,7 @@ def generate_dynamic_questions(
         experience_years: Years of experience (optional)
         skills: List of skills from resume (optional)
         num_questions: Number of questions to generate (default: 3)
+        difficulty: Override difficulty level (optional)
         
     Returns:
         dict: {
@@ -373,9 +375,17 @@ def generate_dynamic_questions(
         if skills:
             context += f"Skills: {', '.join(skills[:5])}\n"
         
-        # Determine difficulty based on experience
+        # Determine difficulty based on explicit param or experience
         difficulty_guidance = ""
-        if experience_years:
+        if difficulty:
+            # Use explicit difficulty param
+            if difficulty == 'beginner':
+                difficulty_guidance = "Focus on BASIC concepts and foundational knowledge. Questions should be friendly and accessible for freshers or career changers. Difficulty: Easy. Avoid complex technical scenarios."
+            elif difficulty == 'advanced':
+                difficulty_guidance = "Focus on ADVANCED topics: system design, leadership, complex problem-solving, edge cases. Challenge the candidate with depth. Difficulty: Hard."
+            else:  # intermediate
+                difficulty_guidance = "Mix of intermediate technical questions and behavioral scenarios. Standard interview difficulty. Difficulty: Medium."
+        elif experience_years:
             try:
                 years = int(experience_years)
                 if years < 2:
@@ -516,3 +526,137 @@ def test_deepgram_connection() -> tuple[bool, str]:
     
     except Exception as e:
         return False, f"Deepgram test failed: {str(e)}"
+
+
+def analyze_transcript_linewise(
+    transcript: str,
+    question: str,
+    role: str = "candidate"
+) -> dict:
+    """
+    Analyze transcript sentence by sentence using Groq LLM.
+    Provides specific feedback and improvement suggestions for each sentence.
+    
+    Args:
+        transcript: The candidate's answer transcript
+        question: The interview question that was asked
+        role: Job role context
+        
+    Returns:
+        dict: {
+            "lineAnalysis": list of {text, type, feedback, suggestion},
+            "error": str | None
+        }
+    """
+    logger.info(f"Analyzing transcript line-by-line for question: {question[:50]}...")
+    
+    if not GROQ_API_KEY:
+        logger.error("GROQ_API_KEY not set")
+        return {"lineAnalysis": [], "error": "API key not configured"}
+    
+    if not transcript or len(transcript.strip()) < 10:
+        return {"lineAnalysis": [], "error": "Transcript too short to analyze"}
+    
+    try:
+        import requests
+        
+        prompt = f"""Analyze this interview answer sentence by sentence.
+
+QUESTION: {question}
+
+ANSWER TRANSCRIPT:
+"{transcript}"
+
+For EACH sentence in the transcript, provide:
+1. "text" - the exact sentence from the transcript
+2. "type" - one of: "good" (strong point), "improve" (needs work), or "neutral"
+3. "feedback" - brief explanation (1 sentence) of why this is good or needs improvement
+4. "suggestion" - ONLY for "improve" type: a better way to phrase this (specific rewrite)
+
+Focus on:
+- Use of specific examples and metrics
+- STAR method (Situation, Task, Action, Result)
+- Confidence and clarity
+- Filler words and vague language
+- Technical accuracy for the role
+
+Respond with ONLY valid JSON in this format:
+{{
+  "lineAnalysis": [
+    {{
+      "text": "exact sentence from transcript",
+      "type": "good|improve|neutral",
+      "feedback": "why this is good or needs improvement",
+      "suggestion": "better alternative phrasing (only for improve type)"
+    }}
+  ]
+}}
+
+Analyze AT MOST 5 sentences. Choose the most impactful ones."""
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 1000
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        
+        if response.status_code != 200:
+            error_msg = f"Groq API error: {response.status_code}"
+            logger.error(f"{error_msg} - {response.text}")
+            return {"lineAnalysis": [], "error": error_msg}
+        
+        result = response.json()
+        response_text = result["choices"][0]["message"]["content"].strip()
+        
+        # Clean up response - remove markdown code blocks if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        # Extract JSON
+        start_idx = response_text.find("{")
+        end_idx = response_text.rfind("}") + 1
+        
+        if start_idx != -1 and end_idx > start_idx:
+            json_str = response_text[start_idx:end_idx]
+            analysis = json.loads(json_str)
+        else:
+            analysis = json.loads(response_text)
+        
+        line_analysis = analysis.get("lineAnalysis", [])
+        
+        # Validate and clean each entry
+        cleaned_analysis = []
+        for item in line_analysis[:5]:  # Limit to 5
+            cleaned_item = {
+                "text": str(item.get("text", "")),
+                "type": item.get("type", "neutral"),
+                "feedback": str(item.get("feedback", "")),
+            }
+            # Only include suggestion for "improve" type
+            if cleaned_item["type"] == "improve" and item.get("suggestion"):
+                cleaned_item["suggestion"] = str(item.get("suggestion", ""))
+            
+            cleaned_analysis.append(cleaned_item)
+        
+        logger.info(f"Line-by-line analysis complete: {len(cleaned_analysis)} sentences analyzed")
+        return {"lineAnalysis": cleaned_analysis, "error": None}
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse line analysis JSON: {e}")
+        return {"lineAnalysis": [], "error": "Failed to parse analysis response"}
+    
+    except Exception as e:
+        logger.error(f"Line analysis error: {str(e)}")
+        return {"lineAnalysis": [], "error": f"Analysis failed: {str(e)}"}
+

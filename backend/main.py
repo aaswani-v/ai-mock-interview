@@ -31,6 +31,7 @@ from groq_deepgram_client import (
     transcribe_audio_deepgram,
     evaluate_answer_groq,
     generate_dynamic_questions,
+    analyze_transcript_linewise,
     test_groq_connection,
     test_deepgram_connection
 )
@@ -541,7 +542,8 @@ async def generate_questions(
     request: Request,
     role: Optional[str] = Form(None),
     experience_years: Optional[str] = Form(None, alias="experienceYears"),
-    skills: Optional[str] = Form(None)  # Comma-separated skills
+    skills: Optional[str] = Form(None),  # Comma-separated skills
+    difficulty: Optional[str] = Form(None)  # 'beginner', 'intermediate', 'advanced'
 ):
     """
     Generate personalized interview questions based on user profile.
@@ -550,11 +552,12 @@ async def generate_questions(
         role: Job role (e.g., "Frontend Engineer", "SDE1")
         experience_years: Years of experience
         skills: Comma-separated list of skills
+        difficulty: Question difficulty level
         
     Returns:
         JSON with generated questions or fallback to static questions
     """
-    logger.info(f"Generating questions for role={role}, experience={experience_years}")
+    logger.info(f"Generating questions for role={role}, experience={experience_years}, difficulty={difficulty}")
     
     # Parse skills if provided
     skills_list = None
@@ -566,7 +569,8 @@ async def generate_questions(
         role=role or "General",
         experience_years=experience_years,
         skills=skills_list,
-        num_questions=3
+        num_questions=3,
+        difficulty=difficulty
     )
     
     # If generation failed or returned no questions, fallback to static questions
@@ -751,7 +755,19 @@ async def analyze_video(
                 (speech_score * 0.2)
             )
 
-            # 9. Build response
+            # 9. Line-by-line transcript analysis for detailed feedback
+            line_analysis_result = analyze_transcript_linewise(
+                transcript=transcript_text,
+                question=question_text,
+                role=role or "General"
+            )
+            line_analysis = line_analysis_result.get("lineAnalysis", [])
+            if line_analysis_result.get("error"):
+                logger.warning(f"Line analysis error: {line_analysis_result.get('error')}")
+            else:
+                logger.info(f"Line analysis complete: {len(line_analysis)} sentences analyzed")
+
+            # 10. Build response
             # Return response with both 'evaluation' and 'content' for compatibility
             evaluation_data = {
                 "score": evaluation_result.get("score", 0),
@@ -776,9 +792,12 @@ async def analyze_video(
                 "visual": visual_stats,
                 "evaluation": evaluation_data,  # For backend consistency
                 "content": evaluation_data,  # For frontend compatibility
+                "lineAnalysis": line_analysis,  # Sentence-by-sentence feedback
                 "evaluationError": evaluation_error,
                 "overallScore": overall_score,
-                "speechScore": speech_score
+                "visualScore": int(visual_score),
+                "contentScore": int(content_score),
+                "speechScore": int(speech_score)
             }
         
         except HTTPException:
