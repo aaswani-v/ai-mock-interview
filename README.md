@@ -1,6 +1,4 @@
-Here is the comprehensive **README.md** file. I have merged the content to ensure the technical stack matches your new description (e.g., switching from Firebase to Supabase, adding Gemini for resumes) while keeping the structure and Mermaid code blocks intact and functional.
 
------
 
 # Interaura: AI Mock Interview & Career Accelerator
 
@@ -8,7 +6,7 @@ Here is the comprehensive **README.md** file. I have merged the content to ensur
 
 **Interaura** is an advanced AI-powered platform designed to bridge the gap between candidate preparation and industry expectations. By simulating real-world interview scenarios and providing objective, data-driven feedback, we transform interview anxiety into confidence.
 
------
+
 
 ## 🧠 The Problem: The "Black Box" of Hiring
 
@@ -27,7 +25,6 @@ Interaura transforms preparation into a science using three core pillars:
 2.  **Multi-Modal AI Mock Interviews**: Real-time simulations that analyze **Content** (what you say), **Speech** (how you say it), and **Visual Presence** (body language).
 3.  **Personalized Growth**: Targeted learning roadmaps generated based on specific performance gaps.
 
------
 
 ## 🏗 Technical Architecture
 
@@ -138,7 +135,6 @@ graph TB
   * **Supabase (PostgreSQL)**: Manages user profiles, interview transcripts, and report data.
   * **Row Level Security (RLS)**: Ensures strict data isolation, allowing users to access only their own records.
 
------
 
 ## 🚀 Key Innovations & Features
 
@@ -161,7 +157,7 @@ We use a hybrid approach to mimic real ATS systems:
   * **Latency Optimization**: Frame sampling (processing every 5th frame) and async pipelines reduced video processing time from 30s to \~8s.
   * **Rate Limit Handling**: Custom request queuing with exponential backoff ensures stability even during high API load.
 
------
+
 
 ## 🗺️ Application Sitemap & Flow
 
@@ -231,7 +227,7 @@ graph TB
       * **Analysis**: Video frames are checked for attention; audio is transcribed and analyzed for fillers; content is scored for relevance.
 5.  **Feedback**: Comprehensive report card comparing "what you said" vs. "how you said it."
 
------
+
 
 ## ⚡ Getting Started
 
@@ -289,7 +285,7 @@ graph TB
         npm run dev
         ```
 
------
+
 
 ## 🔮 Future Roadmap
 
