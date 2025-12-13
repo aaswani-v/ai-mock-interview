@@ -2,6 +2,9 @@ Credentials for testing
 Username: test@test.com
 Password: test@1
 
+![Uploading image.png…]()
+
+
 # Interaura: AI Mock Interview & Career Accelerator
 
 **Team:** AI Forge | **Event:** IITHackathon 2024
