@@ -9,6 +9,27 @@ Due to this website can delay the output, login or account creation.
 
 ![201ca16a-ca86-4983-b721-395aeed210ad](https://github.com/user-attachments/assets/df667dde-d9cc-41dc-8a3a-ade6bf38f44a)
 
+<img width="1919" height="961" alt="1" src="https://github.com/user-attachments/assets/5285c4dd-873b-433d-a61d-98da5d7bccf5" />
+
+<img width="1918" height="906" alt="2" src="https://github.com/user-attachments/assets/6190acc4-4de4-47c7-9f10-98ff19fc958d" />
+
+<img width="1737" height="896" alt="3" src="https://github.com/user-attachments/assets/a28ac464-b7a8-4d6f-99e8-b8662c9989bd" />
+
+<img width="1919" height="903" alt="4" src="https://github.com/user-attachments/assets/79126fa6-ed4d-4a23-b62f-f723c817d28e" />
+
+<img width="1546" height="910" alt="5" src="https://github.com/user-attachments/assets/d750d2d0-4e99-421f-8e48-5bc09d6fce70" />
+
+<img width="1919" height="812" alt="6" src="https://github.com/user-attachments/assets/d48612bc-1823-4c06-845d-221cc1d415ca" />
+
+<img width="1802" height="891" alt="7" src="https://github.com/user-attachments/assets/f696c350-0174-4991-84e2-723379ec3da4" />
+
+<img width="1919" height="900" alt="8" src="https://github.com/user-attachments/assets/2367a130-6c06-480e-bcce-19915b83e831" />
+
+<img width="1642" height="796" alt="9" src="https://github.com/user-attachments/assets/8063ddc6-b14b-448d-9552-735416948772" />
+
+<img width="1911" height="893" alt="10" src="https://github.com/user-attachments/assets/52b293d0-f7dc-47b3-97e0-213f6b1b4024" />
+
+
 
 
 # Interaura: AI Mock Interview & Career Accelerator
