@@ -30,6 +30,9 @@ Due to this website can delay the output, login or account creation.
 <img width="1911" height="893" alt="10" src="https://github.com/user-attachments/assets/52b293d0-f7dc-47b3-97e0-213f6b1b4024" />
 
 
+Walkthrough Video Link: 
+https://drive.google.com/drive/folders/1ho9RYie1kd-1j7gelGx7vlTmeakgrBGg?usp=sharing
+
 
 
 # Interaura: AI Mock Interview & Career Accelerator
