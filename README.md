@@ -1,6 +1,6 @@
-Credential for testing
-Email: test@test.com
-Pass: test@1
+Credentials for testing
+Username: test@test.com
+Password: test@1
 
 # Interaura: AI Mock Interview & Career Accelerator
 
