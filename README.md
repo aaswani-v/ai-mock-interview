@@ -33,6 +33,11 @@ https://drive.google.com/drive/folders/1ho9RYie1kd-1j7gelGx7vlTmeakgrBGg?usp=sha
 
 <img width="1911" height="893" alt="10" src="https://github.com/user-attachments/assets/52b293d0-f7dc-47b3-97e0-213f6b1b4024" />
 
+<img width="1920" height="1080" alt="Screenshot 2025-12-13 202415" src="https://github.com/user-attachments/assets/2733a923-f35c-4bf2-baa6-d7d416ac25dd" />
+
+<img width="1920" height="1080" alt="Screenshot 2025-12-13 202516" src="https://github.com/user-attachments/assets/e24390ec-fac1-462a-9313-2ddca5c8a30b" />
+
+<img width="1920" height="1080" alt="Screenshot 2025-12-13 202556" src="https://github.com/user-attachments/assets/97a41efd-b577-4f59-869d-b198d6a1a5b9" />
 
 
 
