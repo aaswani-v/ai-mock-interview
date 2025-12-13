@@ -2,7 +2,7 @@ Credentials for testing
 Username: test@test.com
 Password: test@1
 
-![Uploading image.png…]()
+![201ca16a-ca86-4983-b721-395aeed210ad](https://github.com/user-attachments/assets/df667dde-d9cc-41dc-8a3a-ade6bf38f44a)
 
 
 # Interaura: AI Mock Interview & Career Accelerator
