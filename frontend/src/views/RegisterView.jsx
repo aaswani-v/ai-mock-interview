@@ -71,7 +71,7 @@ const RegisterView = ({ onRegisterSuccess, onLoginClick, setPendingEmail }) => {
     };
 
     return (
-        <div className="flex items-center justify-center h-full w-full p-6 animate-fade-in-up">
+        <div className="min-h-full overflow-y-auto flex items-center justify-center w-full py-8 px-4 sm:p-6 animate-fade-in-up">
             <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
 

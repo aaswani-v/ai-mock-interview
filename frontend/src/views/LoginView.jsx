@@ -66,7 +66,7 @@ const LoginView = ({ onLogin, onRegisterClick }) => {
     };
 
     return (
-        <div className="flex items-center justify-center h-full w-full p-6 animate-fade-in-up relative overflow-hidden">
+        <div className="min-h-full overflow-y-auto flex items-center justify-center w-full py-8 px-4 sm:p-6 animate-fade-in-up relative">
             {/* Background Gradients */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] animate-float-slow"></div>

@@ -19,6 +19,7 @@ dist/
 # Secrets and API keys
 .env.local
 .env.production
+update-password.js
 
 # Test files and samples
 samples/*.mp4

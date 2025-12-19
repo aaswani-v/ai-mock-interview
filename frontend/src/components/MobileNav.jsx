@@ -67,7 +67,7 @@ const MobileNav = ({ currentView, setView, onLogout }) => {
 
             {/* Mobile Slide-out Menu */}
             <div className={`md:hidden fixed top-0 right-0 bottom-0 z-50 w-72 bg-[#050510] border-l border-slate-800 transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                <div className="p-4 pt-16 h-full flex flex-col">
+                <div className="p-4 pt-16 pb-8 h-full flex flex-col">
                     {/* User Profile */}
                     <div className="mb-6 p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
                         <div className="flex items-center gap-3">
@@ -100,7 +100,7 @@ const MobileNav = ({ currentView, setView, onLogout }) => {
                     </div>
 
                     {/* Logout Button */}
-                    <div className="pt-4 border-t border-slate-800 mt-4">
+                    <div className="pt-4 border-t border-slate-800 mt-4 pb-safe">
                         <button
                             onClick={() => {
                                 onLogout();

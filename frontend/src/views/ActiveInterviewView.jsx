@@ -590,44 +590,45 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     </div>
 
                     {/* Bottom Controls Bar */}
-                    <div className={`h-20 flex items-center justify-center gap-3 ${currentTheme.controlsBg} border-t ${currentTheme.border}`}>
+                    <div className={`h-16 sm:h-20 mb-16 md:mb-0 flex items-center justify-center gap-2 sm:gap-3 ${currentTheme.controlsBg} border-t ${currentTheme.border}`}>
                         {/* Left Controls */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                             {/* Mic Button */}
                             <button
                                 onClick={toggleRecording}
                                 disabled={isProcessing}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${
                                     isRecording 
                                         ? 'bg-red-500 hover:bg-red-600' 
                                         : `${currentTheme.buttonBg} ${currentTheme.buttonHover}`
                                 } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {isRecording ? (
-                                    <Square size={20} fill="white" className="text-white" />
+                                    <Square size={18} fill="white" className="text-white" />
                                 ) : (
-                                    <Mic size={20} className={isRecording ? 'text-white' : currentTheme.textMuted} />
+                                    <Mic size={18} className={isRecording ? 'text-white' : currentTheme.textMuted} />
                                 )}
                             </button>
                             
                             {/* Video Button */}
                             <button
                                 onClick={() => setIsVideoOff(!isVideoOff)}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}
+                                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}
                             >
                                 {isVideoOff ? (
-                                    <VideoOff size={20} className="text-red-400" />
+                                    <VideoOff size={18} className="text-red-400" />
                                 ) : (
-                                    <Video size={20} className={currentTheme.textMuted} />
+                                    <Video size={18} className={currentTheme.textMuted} />
                                 )}
                             </button>
 
+                            {/* Extra Zoom buttons - hidden on mobile */}
                             {theme === 'zoom' && (
                                 <>
-                                    <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                    <button className={`hidden sm:flex w-12 h-12 rounded-full items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
                                         <Monitor size={20} className={currentTheme.textMuted} />
                                     </button>
-                                    <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                    <button className={`hidden sm:flex w-12 h-12 rounded-full items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
                                         <Grid size={20} className={currentTheme.textMuted} />
                                     </button>
                                 </>
@@ -635,29 +636,32 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                         </div>
 
                         {/* Recording Status */}
-                        <div className={`px-4 py-2 rounded-full ${isRecording ? 'bg-red-500/20 border border-red-500/30' : 'bg-black/20'}`}>
-                            <div className="flex items-center gap-3">
+                        <div className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full ${isRecording ? 'bg-red-500/20 border border-red-500/30' : 'bg-black/20'}`}>
+                            <div className="flex items-center gap-2 sm:gap-3">
                                 {isRecording && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>}
-                                <span className={`text-sm font-medium ${isRecording ? 'text-red-400' : currentTheme.textMuted}`}>
-                                    {isRecording ? 'Recording...' : isProcessing ? 'Processing...' : 'Ready to record'}
+                                <span className={`text-xs sm:text-sm font-medium ${isRecording ? 'text-red-400' : currentTheme.textMuted}`}>
+                                    {isRecording ? 'Rec' : isProcessing ? '...' : 'Ready'}
+                                    <span className="hidden sm:inline">
+                                        {isRecording ? 'ording...' : isProcessing ? 'Processing' : ' to record'}
+                                    </span>
                                 </span>
                             </div>
                         </div>
 
                         {/* Right Controls */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                             {/* Chat Toggle */}
                             <button
                                 onClick={() => setShowChat(!showChat)}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${
                                     showChat ? currentTheme.accent : currentTheme.buttonBg
                                 } ${currentTheme.buttonHover}`}
                             >
-                                <MessageSquare size={20} className={showChat ? 'text-white' : currentTheme.textMuted} />
+                                <MessageSquare size={18} className={showChat ? 'text-white' : currentTheme.textMuted} />
                             </button>
 
-                            {/* More Options */}
-                            <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                            {/* More Options - hidden on mobile */}
+                            <button className={`hidden sm:flex w-12 h-12 rounded-full items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
                                 <MoreVertical size={20} className={currentTheme.textMuted} />
                             </button>
 
@@ -665,13 +669,14 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                             <button
                                 onClick={handleFinish}
                                 disabled={isRecording || isProcessing}
-                                className={`px-6 h-12 rounded-full flex items-center gap-2 ${currentTheme.endCall} transition-all ${
+                                className={`px-3 sm:px-6 h-10 sm:h-12 rounded-full flex items-center gap-1 sm:gap-2 ${currentTheme.endCall} transition-all ${
                                     (isRecording || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                             >
-                                <Phone size={18} className="text-white rotate-[135deg]" />
-                                <span className="text-white font-medium">
-                                    {isLastQuestion && lastResult ? 'View Results' : 'End Call'}
+                                <Phone size={16} className="text-white rotate-[135deg]" />
+                                <span className="text-white font-medium text-sm sm:text-base">
+                                    <span className="hidden sm:inline">{isLastQuestion && lastResult ? 'View Results' : 'End Call'}</span>
+                                    <span className="sm:hidden">End</span>
                                 </span>
                             </button>
                         </div>

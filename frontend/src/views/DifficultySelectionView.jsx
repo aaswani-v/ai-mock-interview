@@ -47,7 +47,7 @@ const DifficultySelectionView = ({ onSelect, onBack }) => {
     ];
 
     return (
-        <div className="h-full flex flex-col items-center justify-center p-8 animate-fade-in-up">
+        <div className="min-h-full overflow-y-auto flex flex-col items-center justify-start py-8 px-4 sm:p-8 animate-fade-in-up">
             {/* Header */}
             <div className="text-center mb-10">
                 <h2 className="text-4xl font-black text-white mb-3">
