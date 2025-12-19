@@ -201,10 +201,10 @@ const DashboardView = ({ onNavigate, user }) => {
             </div>
 
             {/* Quote of the Day */}
-            <div className="mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 p-6 flex items-center justify-between shadow-lg">
+            <div className="mb-8 md:mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 p-4 sm:p-6 flex items-center justify-between shadow-lg">
                 <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
                 <div className="relative z-10">
-                    <p className="text-lg md:text-xl font-serif italic text-slate-200">"Success is not final, failure is not fatal: it is the courage to continue that counts."</p>
+                    <p className="text-base sm:text-lg md:text-xl font-light text-slate-200 leading-relaxed">"Success is not final, failure is not fatal: it is the courage to continue that counts."</p>
                     <p className="text-sm text-cyan-400 mt-2 font-semibold">— Winston Churchill</p>
                 </div>
                 <Award className="text-slate-700 opacity-20 absolute right-4 -bottom-4 w-32 h-32 transform rotate-12" />
