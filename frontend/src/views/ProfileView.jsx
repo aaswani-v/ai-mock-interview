@@ -1,23 +1,35 @@
-import React from 'react';
-import { MapPin, Edit3, Flame, CheckCircle, Award, User, Target, Zap, Globe, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MapPin, Edit3, Flame, CheckCircle, Award, User, Target, Zap, Globe, Smartphone, Save, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { API_URL } from '../config';
 
 const ProfileView = ({ profile, onNavigate }) => {
     // Get user data from localStorage for complete profile
     const savedUser = localStorage.getItem('user');
     const userData = savedUser ? JSON.parse(savedUser) : {};
-    
+
     // Merge profile prop with stored user data
-    const displayProfile = {
+    const initialProfile = {
         name: profile?.name || userData?.name || 'User',
         email: profile?.email || userData?.email || 'Not set',
         role: profile?.role || userData?.role || 'Not Set',
         experience: profile?.experience || userData?.experience_years || 'Not Set',
+        salary: profile?.salary || userData?.salary_expectation || 'Not Set',
         goal: profile?.goal || 'Interview Preparation'
     };
-    
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState(initialProfile);
+    const [displayProfile, setDisplayProfile] = useState(initialProfile);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        setDisplayProfile(initialProfile);
+        setEditForm(initialProfile);
+    }, [JSON.stringify(initialProfile)]); // Deep comparison for simple object
+
     // Generate initials from name
     const getInitials = (name) => {
         if (!name) return 'U';
@@ -26,6 +38,69 @@ const ProfileView = ({ profile, onNavigate }) => {
             return (parts[0][0] + parts[1][0]).toUpperCase();
         }
         return name.substring(0, 2).toUpperCase();
+    };
+
+    const handleEditToggle = () => {
+        if (!isEditing) {
+            setEditForm(displayProfile);
+        }
+        setIsEditing(!isEditing);
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setEditForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            // Update Backend
+            if (userData?.uid) {
+                const formData = new FormData();
+                formData.append('user_id', userData.uid);
+                formData.append('name', editForm.name);
+                formData.append('role', editForm.role);
+                formData.append('experienceYears', editForm.experience);
+                formData.append('salaryExpectation', editForm.salary);
+
+                const response = await fetch(`${API_URL}/profile/update`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update profile on server');
+                }
+            }
+
+            // Update Local Storage
+            const updatedUser = {
+                ...userData,
+                name: editForm.name,
+                role: editForm.role,
+                experience_years: editForm.experience,
+                salary_expectation: editForm.salary
+            };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+
+            // Update State
+            setDisplayProfile(editForm);
+            setIsEditing(false);
+
+            // Force reload to update header/sidebar if needed, or better, use a context/callback
+            // For now, we update local state which is good enough for this view
+            window.dispatchEvent(new Event('storage')); // Trigger update for other components listening to storage
+
+        } catch (error) {
+            console.error("Error saving profile:", error);
+            alert("Failed to save profile changes. Please try again.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -46,7 +121,14 @@ const ProfileView = ({ profile, onNavigate }) => {
                     </div>
                 </div>
                 <div className="absolute -bottom-16 right-8 flex gap-3">
-                    <Button variant="secondary" icon={Edit3} onClick={() => onNavigate('settings')}>Edit Profile</Button>
+                    {isEditing ? (
+                        <>
+                            <Button variant="danger" icon={X} onClick={handleEditToggle} disabled={isSaving}>Cancel</Button>
+                            <Button variant="primary" icon={Save} onClick={handleSave} loading={isSaving}>Save Changes</Button>
+                        </>
+                    ) : (
+                        <Button variant="secondary" icon={Edit3} onClick={handleEditToggle}>Edit Profile</Button>
+                    )}
                 </div>
             </div>
 
@@ -81,19 +163,50 @@ const ProfileView = ({ profile, onNavigate }) => {
                         <div className="grid grid-cols-2 gap-6">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Full Name</label>
-                                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.name}</div>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={editForm.name}
+                                        onChange={handleChange}
+                                        className="w-full p-3 bg-slate-900 rounded-xl border border-slate-700 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                                    />
+                                ) : (
+                                    <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.name}</div>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Email</label>
-                                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.email}</div>
+                                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-400 cursor-not-allowed" title="Email cannot be changed">{displayProfile.email}</div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Role</label>
-                                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.role}</div>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        name="role"
+                                        value={editForm.role}
+                                        onChange={handleChange}
+                                        className="w-full p-3 bg-slate-900 rounded-xl border border-slate-700 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                                    />
+                                ) : (
+                                    <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.role}</div>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Experience</label>
-                                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.experience}</div>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        name="experience"
+                                        value={editForm.experience}
+                                        onChange={handleChange}
+                                        placeholder="e.g. 3 years, Senior"
+                                        className="w-full p-3 bg-slate-900 rounded-xl border border-slate-700 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                                    />
+                                ) : (
+                                    <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 text-slate-200">{displayProfile.experience}</div>
+                                )}
                             </div>
                         </div>
                     </Card>
@@ -104,7 +217,17 @@ const ProfileView = ({ profile, onNavigate }) => {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Target Role</label>
                                 <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700 text-white font-medium flex justify-between items-center">
-                                    {displayProfile.role}
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            name="role" // Reusing role as target role for now
+                                            value={editForm.role}
+                                            onChange={handleChange}
+                                            className="bg-transparent border-none text-white focus:outline-none w-full"
+                                        />
+                                    ) : (
+                                        displayProfile.role
+                                    )}
                                     <Badge variant="info">Primary</Badge>
                                 </div>
                             </div>
