@@ -37,8 +37,8 @@ const LandingView = ({ onStart }) => {
                         </h1>
 
                         <div className="h-auto sm:h-8 md:h-12 mb-8 sm:mb-12 flex justify-center">
-                            <p className="text-base sm:text-xl md:text-2xl text-slate-400 font-mono sm:border-r-4 sm:border-cyan-500 pr-2 sm:animate-typewriter overflow-hidden sm:whitespace-nowrap w-fit text-center sm:text-left">
-                                Real-time interviews + AI feedback
+                            <p className="text-base sm:text-xl md:text-2xl text-slate-400 font-mono sm:border-r-4 sm:border-cyan-500 pr-2 sm:animate-typewriter sm:overflow-hidden sm:whitespace-nowrap w-full sm:w-fit text-center sm:text-left break-words">
+                                Real-time mock interviews + personalized feedback
                             </p>
                         </div>
 
