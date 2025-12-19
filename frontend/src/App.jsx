@@ -23,6 +23,7 @@ import InterviewResultsView from './views/InterviewResultsView';
 
 // Components
 import Sidebar from './components/Sidebar';
+import MobileNav from './components/MobileNav';
 
 // Config
 import { API_URL } from './config';
@@ -428,11 +429,14 @@ const App = () => {
 
       <div className="relative z-10 flex h-full">
         {showSidebar && (
-          <Sidebar currentView={view} setView={setView} onLogout={handleLogout} />
+          <>
+            <Sidebar currentView={view} setView={setView} onLogout={handleLogout} />
+            <MobileNav currentView={view} setView={setView} onLogout={handleLogout} />
+          </>
         )}
 
         {/* Main Content Area */}
-        <main className={`flex-1 relative h-full overflow-y-auto transition-all duration-300 ${showSidebar ? 'md:ml-20' : ''}`}>
+        <main className={`flex-1 relative h-full overflow-y-auto transition-all duration-300 ${showSidebar ? 'md:ml-20 pt-16 pb-20 md:pt-0 md:pb-0' : ''}`}>
           {renderContent()}
         </main>
       </div>

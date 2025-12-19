@@ -455,23 +455,23 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
     return (
         <div className={`flex flex-col h-full ${currentTheme.bg}`}>
             {/* Top Bar - Meeting Info */}
-            <div className={`h-14 flex items-center justify-between px-4 border-b ${currentTheme.border}`}>
-                <div className="flex items-center gap-4">
+            <div className={`h-12 sm:h-14 flex items-center justify-between px-2 sm:px-4 border-b ${currentTheme.border}`}>
+                <div className="flex items-center gap-2 sm:gap-4">
                     {/* Theme Switcher */}
                     <div className="flex items-center gap-1 bg-black/20 rounded-full p-1">
                         <button
                             onClick={() => handleThemeChange('meet')}
-                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                            className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium transition-all ${
                                 theme === 'meet' 
                                     ? 'bg-blue-500 text-white' 
                                     : 'text-gray-400 hover:text-white'
                             }`}
                         >
-                            Google Meet
+                            <span className="hidden sm:inline">Google </span>Meet
                         </button>
                         <button
                             onClick={() => handleThemeChange('zoom')}
-                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                            className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium transition-all ${
                                 theme === 'zoom' 
                                     ? 'bg-[#0e72ed] text-white' 
                                     : 'text-gray-400 hover:text-white'
@@ -480,11 +480,11 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                             Zoom
                         </button>
                     </div>
-                    <div className="h-6 w-px bg-gray-600"></div>
-                    <span className={`text-sm font-medium ${currentTheme.text}`}>
+                    <div className="hidden sm:block h-6 w-px bg-gray-600"></div>
+                    <span className={`hidden sm:inline text-sm font-medium ${currentTheme.text}`}>
                         Mock Interview Session
                     </span>
-                    <span className={`text-xs ${currentTheme.textMuted}`}>
+                    <span className={`hidden md:inline text-xs ${currentTheme.textMuted}`}>
                         | {profile.role} Interview
                     </span>
                 </div>
@@ -514,31 +514,31 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                 {/* Video Area */}
                 <div className={`flex-1 flex flex-col ${showChat ? '' : ''}`}>
                     {/* Video Grid */}
-                    <div className="flex-1 p-4 flex gap-4">
+                    <div className="flex-1 p-2 sm:p-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
                         {/* AI Interviewer Video (Main) */}
-                        <div className={`flex-1 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border}`}>
+                        <div className={`flex-1 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border} min-h-[200px] sm:min-h-0`}>
                             {/* AI Avatar/Placeholder */}
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-center">
-                                    <div className={`w-24 h-24 mx-auto rounded-full ${theme === 'meet' ? 'bg-blue-600' : 'bg-[#0e72ed]'} flex items-center justify-center mb-4`}>
-                                        <span className="text-4xl font-bold text-white">AI</span>
+                                    <div className={`w-16 h-16 sm:w-24 sm:h-24 mx-auto rounded-full ${theme === 'meet' ? 'bg-blue-600' : 'bg-[#0e72ed]'} flex items-center justify-center mb-2 sm:mb-4`}>
+                                        <span className="text-2xl sm:text-4xl font-bold text-white">AI</span>
                                     </div>
-                                    <p className={`text-lg font-medium ${currentTheme.text}`}>AI Interviewer</p>
-                                    <p className={`text-sm ${currentTheme.textMuted}`}>Listening...</p>
+                                    <p className={`text-base sm:text-lg font-medium ${currentTheme.text}`}>AI Interviewer</p>
+                                    <p className={`text-xs sm:text-sm ${currentTheme.textMuted}`}>Listening...</p>
                                 </div>
                             </div>
                             
                             {/* Question Overlay */}
-                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                                <p className={`text-sm ${currentTheme.textMuted} mb-1`}>Question {currentQuestionIndex + 1} of {questions.length}</p>
-                                <p className={`text-lg font-medium ${currentTheme.text} line-clamp-2`}>
+                            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/80 to-transparent">
+                                <p className={`text-xs ${currentTheme.textMuted} mb-1`}>Question {currentQuestionIndex + 1} of {questions.length}</p>
+                                <p className={`text-sm sm:text-lg font-medium ${currentTheme.text} line-clamp-2`}>
                                     {currentQuestion?.question || "Loading question..."}
                                 </p>
                             </div>
                         </div>
 
                         {/* Self View (Picture-in-Picture style) */}
-                        <div className={`w-72 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border}`}>
+                        <div className={`w-full sm:w-72 h-32 sm:h-auto relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border}`}>
                             <video
                                 ref={videoPreviewRef}
                                 autoPlay

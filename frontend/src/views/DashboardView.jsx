@@ -176,24 +176,27 @@ const DashboardView = ({ onNavigate, user }) => {
     return (
         <div className="h-full p-6 max-w-7xl mx-auto overflow-y-auto custom-scrollbar animate-fade-in-up">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 md:mb-8 gap-4">
                 <div>
-                    <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
                         Hello, {safeName}
                     </h2>
-                    <p className="text-slate-400 mt-1 flex items-center gap-2">
+                    <p className="text-slate-400 mt-1 flex items-center gap-2 text-sm md:text-base">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                         {stats.totalInterviews > 0 
-                            ? `${stats.totalInterviews} interviews completed • Keep practicing!`
+                            ? `${stats.totalInterviews} interviews completed`
                             : 'Ready to crush your next interview?'}
                     </p>
                 </div>
-                <div className="flex gap-3">
-                    <div className="px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 flex items-center gap-2 text-sm text-slate-300 shadow-sm">
+                <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                    <div className="px-3 sm:px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 flex items-center gap-2 text-sm text-slate-300 shadow-sm">
                         <Flame size={18} className={`${streak > 0 ? 'text-orange-500 fill-orange-500 animate-pulse-slow' : 'text-slate-500'}`} />
-                        <span className="font-bold text-white">{streak} Day Streak</span>
+                        <span className="font-bold text-white">{streak}<span className="hidden sm:inline"> Day Streak</span></span>
                     </div>
-                    <Button variant="secondary" icon={Upload} onClick={() => onNavigate('resume-upload')}>New Resume</Button>
+                    <Button variant="secondary" icon={Upload} onClick={() => onNavigate('resume-upload')} className="flex-1 sm:flex-none">
+                        <span className="hidden sm:inline">New Resume</span>
+                        <span className="sm:hidden">Resume</span>
+                    </Button>
                 </div>
             </div>
 

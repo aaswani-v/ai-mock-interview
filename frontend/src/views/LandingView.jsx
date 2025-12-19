@@ -20,7 +20,7 @@ const LandingView = ({ onStart }) => {
 
                 {/* HERO SECTION */}
                 <div className="relative min-h-screen w-full flex flex-col items-center justify-center py-20 z-10">
-                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden opacity-100 pointer-events-none">
+                    <div className="hidden sm:flex absolute inset-0 items-center justify-center overflow-hidden opacity-100 pointer-events-none">
                         <OrbitalSystem centerIcon={Brain} orbitingIcons={[FileText, Target, Activity]} label="" color="cyan" delay={0} />
                         <div className="absolute w-[800px] h-[800px] border border-purple-500/20 rounded-full animate-spin-slow" style={{ animationDuration: '60s' }}></div>
                         <div className="absolute w-[450px] h-[450px] border-2 border-green-500/10 rounded-full animate-spin-slow" style={{ animationDuration: '30s', animationDirection: 'reverse' }}></div>
@@ -32,22 +32,23 @@ const LandingView = ({ onStart }) => {
                             <span className="text-xs font-bold tracking-[0.2em] uppercase">Next Gen Interview Prep</span>
                         </div>
 
-                        <h1 className="text-6xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-400 to-purple-500 text-white mb-8 leading-tight tracking-tight drop-shadow-[0_0_40px_rgba(34,211,238,0.2)] bg-[length:200%_auto] animate-gradient-x hover:bg-right transition-all duration-500 cursor-default">
+                        <h1 className="text-4xl sm:text-6xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-400 to-purple-500 text-white mb-6 sm:mb-8 leading-tight tracking-tight drop-shadow-[0_0_40px_rgba(34,211,238,0.2)] bg-[length:200%_auto] animate-gradient-x hover:bg-right transition-all duration-500 cursor-default">
                             INTERAURA
                         </h1>
 
-                        <div className="h-8 md:h-12 mb-12 flex justify-center">
-                            <p className="text-xl md:text-2xl text-slate-400 font-mono border-r-4 border-cyan-500 pr-2 animate-typewriter overflow-hidden whitespace-nowrap w-fit">
-                                Real-time mock interviews + personalized feedback
+                        <div className="h-auto sm:h-8 md:h-12 mb-8 sm:mb-12 flex justify-center">
+                            <p className="text-base sm:text-xl md:text-2xl text-slate-400 font-mono sm:border-r-4 sm:border-cyan-500 pr-2 sm:animate-typewriter overflow-hidden sm:whitespace-nowrap w-fit text-center sm:text-left">
+                                Real-time interviews + AI feedback
                             </p>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row justify-center gap-6 mb-24 relative group">
-                            <button onClick={onStart} className="relative px-12 py-6 bg-white text-slate-900 text-xl font-bold rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(255,255,255,0.6)] group">
+                        <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16 sm:mb-24 relative group">
+                            <button onClick={onStart} className="relative px-8 sm:px-12 py-4 sm:py-6 bg-white text-slate-900 text-lg sm:text-xl font-bold rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(255,255,255,0.6)] group">
                                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 opacity-20 group-hover:opacity-40 animate-shine-slow"></div>
-                                <span className="relative z-10 flex items-center gap-3">
+                                <span className="relative z-10 flex items-center justify-center gap-3">
                                     <Zap className="text-purple-600 group-hover:text-purple-800 transition-colors" fill="currentColor" />
-                                    START YOUR JOURNEY
+                                    <span className="hidden sm:inline">START YOUR JOURNEY</span>
+                                    <span className="sm:hidden">GET STARTED</span>
                                     <ArrowRight className="group-hover:translate-x-1 transition-transform" />
                                 </span>
                             </button>
