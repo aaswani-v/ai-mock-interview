@@ -816,7 +816,309 @@ async def analyze_video(
             )
 
 
+# ============================================================================
+# INTERVIEW DATA MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.post("/api/interview/save")
+async def save_interview(
+    user_id: str = Form(...),
+    overall_score: int = Form(...),
+    visual_score: int = Form(0),
+    content_score: int = Form(0),
+    speech_score: int = Form(0),
+    difficulty: str = Form("intermediate"),
+    domain: str = Form("General"),
+    duration: int = Form(0),
+    questions_answered: int = Form(1),
+    questions: Optional[str] = Form(None)  # JSON string of questions
+):
+    """
+    Save interview results to database
+    
+    Args:
+        user_id: User ID
+        overall_score: Overall interview score (0-100)
+        visual_score: Visual analysis score
+        content_score: Content quality score
+        speech_score: Speech analysis score
+        difficulty: Interview difficulty level
+        domain: Interview domain/topic
+        duration: Interview duration in minutes
+        questions_answered: Number of questions answered
+        questions: JSON string of questions and responses
+        
+    Returns:
+        Success status and interview ID
+    """
+    try:
+        import json as json_lib
+        
+        interview_data = {
+            "overall_score": overall_score,
+            "visual_score": visual_score,
+            "content_score": content_score,
+            "speech_score": speech_score,
+            "difficulty": difficulty,
+            "domain": domain,
+            "duration_minutes": duration,
+            "questions_answered": questions_answered,
+            "questions": json_lib.loads(questions) if questions else []
+        }
+        
+        interview_id = InterviewDB.save_interview(user_id, interview_data)
+        
+        if interview_id:
+            return {
+                "success": True,
+                "interview_id": interview_id,
+                "message": "Interview saved successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save interview")
+    
+    except json_lib.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid questions JSON format")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save interview error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save interview")
+
+
+@app.get("/api/interviews/{user_id}")
+async def get_interviews(user_id: str, limit: int = 10):
+    """
+    Get user's interview history
+    
+    Args:
+        user_id: User ID
+        limit: Maximum number of interviews to return (default 10)
+        
+    Returns:
+        List of interview records
+    """
+    try:
+        interviews = InterviewDB.get_user_interviews(user_id, limit)
+        latest = InterviewDB.get_latest_interview(user_id)
+        
+        return {
+            "success": True,
+            "interviews": interviews,
+            "latest": latest,
+            "total": len(interviews)
+        }
+    
+    except Exception as e:
+        logger.error(f"Get interviews error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get interviews")
+
+
+@app.get("/api/performance/{user_id}")
+async def get_performance(user_id: str):
+    """
+    Get aggregated performance statistics for user
+    
+    Args:
+        user_id: User ID
+        
+    Returns:
+        Performance statistics including averages, trends, and domain scores
+    """
+    try:
+        stats = InterviewDB.get_performance_stats(user_id)
+        weak_domains = InterviewDB.get_weak_domains(user_id)
+        
+        return {
+            "success": True,
+            "stats": stats,
+            "weak_domains": weak_domains
+        }
+    
+    except Exception as e:
+        logger.error(f"Get performance error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get performance stats")
+
+
+@app.get("/api/resume/{user_id}")
+async def get_resume(user_id: str):
+    """
+    Get saved resume data for user
+    
+    Args:
+        user_id: User ID
+        
+    Returns:
+        Resume data including parsed content and analysis
+    """
+    try:
+        resume = ResumeDB.get_resume(user_id)
+        
+        if resume:
+            return {
+                "success": True,
+                "resume": resume
+            }
+        else:
+            return {
+                "success": True,
+                "resume": None,
+                "message": "No resume found for user"
+            }
+    
+    except Exception as e:
+        logger.error(f"Get resume error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get resume")
+
+
+@app.get("/api/recommendations/{user_id}")
+async def get_recommendations(user_id: str):
+    """
+    Generate learning recommendations based on weak areas
+    
+    Args:
+        user_id: User ID
+        
+    Returns:
+        Personalized learning recommendations
+    """
+    try:
+        weak_domains = InterviewDB.get_weak_domains(user_id)
+        stats = InterviewDB.get_performance_stats(user_id)
+        
+        recommendations = []
+        
+        # Learning resources mapping
+        resources_map = {
+            "Technical": [
+                {"title": "Data Structures & Algorithms Masterclass", "type": "Course", "link": "https://www.coursera.org/algorithms", "duration": "10 hours"},
+                {"title": "System Design Fundamentals", "type": "Guide", "link": "https://github.com/donnemartin/system-design-primer", "duration": "5 hours"},
+                {"title": "LeetCode Top 100 Problems", "type": "Practice", "link": "https://leetcode.com/problemset/top-100-liked-questions/", "duration": "20+ hours"}
+            ],
+            "Communication": [
+                {"title": "Public Speaking Mastery", "type": "Course", "link": "https://www.coursera.org/public-speaking", "duration": "4 hours"},
+                {"title": "STAR Method Interview Guide", "type": "Article", "link": "https://www.indeed.com/star-method", "duration": "15 min"},
+                {"title": "Body Language for Interviews", "type": "Video", "link": "https://www.youtube.com/results?search_query=interview+body+language", "duration": "30 min"}
+            ],
+            "Behavioral": [
+                {"title": "Top 50 Behavioral Questions", "type": "Guide", "link": "https://www.themuse.com/behavioral-interview-questions", "duration": "2 hours"},
+                {"title": "Emotional Intelligence at Work", "type": "Course", "link": "https://www.linkedin.com/learning/emotional-intelligence", "duration": "3 hours"},
+                {"title": "Conflict Resolution Strategies", "type": "Article", "link": "https://www.mindtools.com/conflict-resolution", "duration": "20 min"}
+            ],
+            "General": [
+                {"title": "Mock Interview Practice Tips", "type": "Guide", "link": "https://www.glassdoor.com/interview-tips", "duration": "30 min"},
+                {"title": "Confidence Building Techniques", "type": "Video", "link": "https://www.youtube.com/results?search_query=interview+confidence", "duration": "20 min"},
+                {"title": "Resume Optimization Guide", "type": "Article", "link": "https://www.resumegenius.com/tips", "duration": "15 min"}
+            ]
+        }
+        
+        # Generate recommendations based on weak domains
+        for weak in weak_domains[:3]:  # Top 3 weak areas
+            domain = weak["domain"]
+            resources = resources_map.get(domain, resources_map["General"])
+            
+            recommendations.append({
+                "domain": domain,
+                "current_score": weak["score"],
+                "target_score": 70,
+                "gap": weak["gap"],
+                "priority": "High" if weak["gap"] > 20 else "Medium",
+                "resources": resources[:2],  # Top 2 resources per domain
+                "improvement_tips": [
+                    f"Focus on improving {domain.lower()} skills",
+                    f"Practice at least 3 interviews targeting {domain.lower()}",
+                    "Review feedback from previous interviews"
+                ]
+            })
+        
+        # Add general recommendations if no weak domains
+        if not recommendations:
+            avg_score = stats.get("avg_overall_score", 0)
+            if avg_score < 80:
+                recommendations.append({
+                    "domain": "General",
+                    "current_score": avg_score,
+                    "target_score": 80,
+                    "gap": 80 - avg_score,
+                    "priority": "Medium",
+                    "resources": resources_map["General"],
+                    "improvement_tips": [
+                        "Continue practicing to maintain your skills",
+                        "Try more challenging interview scenarios",
+                        "Focus on areas with lowest scores"
+                    ]
+                })
+            else:
+                recommendations.append({
+                    "domain": "Excellence",
+                    "current_score": avg_score,
+                    "target_score": 100,
+                    "gap": 100 - avg_score,
+                    "priority": "Low",
+                    "resources": [
+                        {"title": "Advanced Interview Strategies", "type": "Masterclass", "link": "#", "duration": "2 hours"},
+                        {"title": "Leadership in Interviews", "type": "Course", "link": "#", "duration": "3 hours"}
+                    ],
+                    "improvement_tips": [
+                        "You're doing great! Keep up the excellent work",
+                        "Consider helping others with mock interviews",
+                        "Focus on edge cases and difficult scenarios"
+                    ]
+                })
+        
+        return {
+            "success": True,
+            "recommendations": recommendations,
+            "stats_summary": {
+                "total_interviews": stats.get("total_interviews", 0),
+                "avg_score": stats.get("avg_overall_score", 0),
+                "improvement": stats.get("improvement", 0)
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Get recommendations error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get recommendations")
+
+
+@app.get("/api/user/complete-data/{user_id}")
+async def get_complete_user_data(user_id: str):
+    """
+    Get all user data including profile, interviews, resume, and performance
+    
+    Args:
+        user_id: User ID
+        
+    Returns:
+        Complete user data bundle
+    """
+    try:
+        profile = UserDB.get_user(user_id)
+        interviews = InterviewDB.get_user_interviews(user_id, 10)
+        latest_interview = InterviewDB.get_latest_interview(user_id)
+        resume = ResumeDB.get_resume(user_id)
+        performance = InterviewDB.get_performance_stats(user_id)
+        weak_domains = InterviewDB.get_weak_domains(user_id)
+        
+        return {
+            "success": True,
+            "data": {
+                "profile": profile,
+                "interviews": interviews,
+                "latest_interview": latest_interview,
+                "resume": resume,
+                "performance": performance,
+                "weak_domains": weak_domains
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Get complete user data error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get user data")
+
+
 # Instructions for running
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

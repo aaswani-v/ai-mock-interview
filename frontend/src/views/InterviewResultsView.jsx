@@ -172,13 +172,7 @@ const InterviewResultsView = ({ data, onHome }) => {
                     )}
                 </Card>
 
-                {/* Transcript */}
-                <Card className="mb-8">
-                    <h3 className="text-lg font-bold text-white mb-4">Your Response</h3>
-                    <p className="text-slate-300 leading-relaxed bg-slate-800/50 p-4 rounded-xl">
-                        {transcript}
-                    </p>
-                </Card>
+
 
                 {/* Suggestions */}
                 {contentData.suggestions && contentData.suggestions.length > 0 && (

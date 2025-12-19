@@ -36,6 +36,12 @@ CREATE TABLE IF NOT EXISTS interviews (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     questions JSONB DEFAULT '[]'::jsonb,
     overall_score INTEGER DEFAULT 0,
+    visual_score INTEGER DEFAULT 0,
+    content_score INTEGER DEFAULT 0,
+    speech_score INTEGER DEFAULT 0,
+    difficulty TEXT DEFAULT 'intermediate',
+    domain TEXT DEFAULT 'General',
+    questions_answered INTEGER DEFAULT 1,
     duration_minutes INTEGER DEFAULT 0,
     session_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

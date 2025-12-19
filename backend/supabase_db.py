@@ -224,20 +224,48 @@ class InterviewDB:
     
     @staticmethod
     def save_interview(uid: str, interview_data: Dict) -> Optional[int]:
-        """Save interview session to database"""
+        """Save interview session to database with extended fields"""
         try:
+            import json as json_lib
             client = get_supabase()
-            interview_data["user_id"] = uid
-            interview_data["session_date"] = datetime.utcnow().isoformat()
             
-            response = client.table('interviews').insert(interview_data).execute()
+            # Prepare interview data with all fields
+            # Ensure questions is properly serialized for JSONB
+            questions_data = interview_data.get("questions", [])
+            if isinstance(questions_data, str):
+                try:
+                    questions_data = json_lib.loads(questions_data)
+                except:
+                    questions_data = []
+            
+            data_to_save = {
+                "user_id": uid,
+                "session_date": datetime.utcnow().isoformat(),
+                "overall_score": int(interview_data.get("overall_score", 0) or 0),
+                "visual_score": int(interview_data.get("visual_score", 0) or 0),
+                "content_score": int(interview_data.get("content_score", 0) or 0),
+                "speech_score": int(interview_data.get("speech_score", 0) or 0),
+                "difficulty": str(interview_data.get("difficulty", "intermediate") or "intermediate"),
+                "domain": str(interview_data.get("domain", "General") or "General"),
+                "questions_answered": int(interview_data.get("questions_answered", 1) or 1),
+                "duration_minutes": int(interview_data.get("duration_minutes", 0) or 0),
+                "questions": questions_data
+            }
+            
+            logger.info(f"Saving interview for user {uid}: {data_to_save}")
+            
+            response = client.table('interviews').insert(data_to_save).execute()
             
             if response.data and len(response.data) > 0:
-                logger.info(f"Interview saved for user: {uid}")
+                logger.info(f"Interview saved for user: {uid}, ID: {response.data[0]['id']}")
                 return response.data[0]['id']
+            
+            logger.error(f"Interview save returned no data for user: {uid}")
             return None
         except Exception as e:
-            logger.error(f"Error saving interview: {str(e)}")
+            logger.error(f"Error saving interview for user {uid}: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     @staticmethod
@@ -255,4 +283,137 @@ class InterviewDB:
             return response.data if response.data else []
         except Exception as e:
             logger.error(f"Error getting interviews: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_latest_interview(uid: str) -> Optional[Dict]:
+        """Get user's most recent interview"""
+        try:
+            client = get_supabase()
+            response = client.table('interviews')\
+                .select("*")\
+                .eq('user_id', uid)\
+                .order('session_date', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting latest interview: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_performance_stats(uid: str) -> Dict:
+        """Calculate aggregated performance statistics for user"""
+        try:
+            client = get_supabase()
+            response = client.table('interviews')\
+                .select("*")\
+                .eq('user_id', uid)\
+                .order('session_date', desc=True)\
+                .execute()
+            
+            interviews = response.data if response.data else []
+            
+            if not interviews:
+                return {
+                    "total_interviews": 0,
+                    "avg_overall_score": 0,
+                    "avg_visual_score": 0,
+                    "avg_content_score": 0,
+                    "avg_speech_score": 0,
+                    "best_score": 0,
+                    "latest_score": 0,
+                    "improvement": 0,
+                    "domain_scores": {},
+                    "recent_trend": []
+                }
+            
+            total = len(interviews)
+            avg_overall = sum(i.get("overall_score", 0) for i in interviews) / total
+            avg_visual = sum(i.get("visual_score", 0) for i in interviews) / total
+            avg_content = sum(i.get("content_score", 0) for i in interviews) / total
+            avg_speech = sum(i.get("speech_score", 0) for i in interviews) / total
+            best_score = max(i.get("overall_score", 0) for i in interviews)
+            latest_score = interviews[0].get("overall_score", 0) if interviews else 0
+            
+            # Calculate improvement (compare latest with previous)
+            improvement = 0
+            if total >= 2:
+                previous_score = interviews[1].get("overall_score", 0)
+                improvement = latest_score - previous_score
+            
+            # Domain-wise scores
+            domain_scores = {}
+            for interview in interviews:
+                domain = interview.get("domain", "General")
+                if domain not in domain_scores:
+                    domain_scores[domain] = {"total": 0, "count": 0}
+                domain_scores[domain]["total"] += interview.get("overall_score", 0)
+                domain_scores[domain]["count"] += 1
+            
+            for domain in domain_scores:
+                count = domain_scores[domain]["count"]
+                domain_scores[domain] = round(domain_scores[domain]["total"] / count) if count > 0 else 0
+            
+            # Recent trend (last 7 interviews)
+            recent_trend = [
+                {
+                    "date": i.get("session_date", ""),
+                    "score": i.get("overall_score", 0),
+                    "domain": i.get("domain", "General")
+                }
+                for i in interviews[:7]
+            ]
+            
+            return {
+                "total_interviews": total,
+                "avg_overall_score": round(avg_overall),
+                "avg_visual_score": round(avg_visual),
+                "avg_content_score": round(avg_content),
+                "avg_speech_score": round(avg_speech),
+                "best_score": best_score,
+                "latest_score": latest_score,
+                "improvement": improvement,
+                "domain_scores": domain_scores,
+                "recent_trend": recent_trend
+            }
+        except Exception as e:
+            logger.error(f"Error getting performance stats: {str(e)}")
+            return {
+                "total_interviews": 0,
+                "avg_overall_score": 0,
+                "avg_visual_score": 0,
+                "avg_content_score": 0,
+                "avg_speech_score": 0,
+                "best_score": 0,
+                "latest_score": 0,
+                "improvement": 0,
+                "domain_scores": {},
+                "recent_trend": []
+            }
+    
+    @staticmethod
+    def get_weak_domains(uid: str, threshold: int = 60) -> List[Dict]:
+        """Identify weak domains based on interview performance"""
+        try:
+            stats = InterviewDB.get_performance_stats(uid)
+            domain_scores = stats.get("domain_scores", {})
+            
+            weak_domains = []
+            for domain, score in domain_scores.items():
+                if score < threshold:
+                    weak_domains.append({
+                        "domain": domain,
+                        "score": score,
+                        "gap": threshold - score
+                    })
+            
+            # Sort by gap (largest gap first)
+            weak_domains.sort(key=lambda x: x["gap"], reverse=True)
+            return weak_domains
+        except Exception as e:
+            logger.error(f"Error getting weak domains: {str(e)}")
             return []

@@ -1,25 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, ArrowRight, Video, RefreshCw, Loader2, CheckCircle, AlertCircle, Lightbulb } from 'lucide-react';
+import { Mic, MicOff, Square, Video, VideoOff, RefreshCw, Loader2, CheckCircle, AlertCircle, Lightbulb, MoreVertical, Users, MessageSquare, Shield, Settings, Phone, Monitor, Grid, Maximize2 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import AudioVisualizer from '../components/visuals/AudioVisualizer';
 import { API_URL } from '../config';
 
+// Theme configurations
+const THEMES = {
+    meet: {
+        name: 'Google Meet',
+        bg: 'bg-[#202124]',
+        controlsBg: 'bg-[#202124]',
+        buttonBg: 'bg-[#3c4043]',
+        buttonHover: 'hover:bg-[#4a4d51]',
+        accent: 'bg-blue-500',
+        accentHover: 'hover:bg-blue-600',
+        endCall: 'bg-red-500 hover:bg-red-600',
+        text: 'text-white',
+        textMuted: 'text-gray-400',
+        border: 'border-[#3c4043]',
+        videoBg: 'bg-[#3c4043]',
+        chatBg: 'bg-[#292b2e]'
+    },
+    zoom: {
+        name: 'Zoom',
+        bg: 'bg-[#1a1a1a]',
+        controlsBg: 'bg-[#2d2d2d]',
+        buttonBg: 'bg-[#4a4a4a]',
+        buttonHover: 'hover:bg-[#5a5a5a]',
+        accent: 'bg-[#0e72ed]',
+        accentHover: 'hover:bg-[#0d65d4]',
+        endCall: 'bg-red-600 hover:bg-red-700',
+        text: 'text-white',
+        textMuted: 'text-gray-400',
+        border: 'border-[#3c3c3c]',
+        videoBg: 'bg-black',
+        chatBg: 'bg-[#242424]'
+    }
+};
+
 // Simple markdown-like text parser for chat messages
 const FormattedText = ({ text }) => {
-    // Parse simple markdown: **bold**, *italic*, line breaks, and horizontal rules
     const parseText = (text) => {
         if (!text) return null;
-        
-        // Split by line breaks first
         const lines = text.split('\n');
         
         return lines.map((line, lineIdx) => {
-            // Handle horizontal rule (---)
             if (line.trim() === '---') {
                 return <hr key={lineIdx} className="border-slate-600 my-3" />;
             }
             
-            // Handle bold text (**text**)
             const parts = line.split(/(\*\*.*?\*\*)/g);
             const formattedParts = parts.map((part, partIdx) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
@@ -40,7 +69,7 @@ const FormattedText = ({ text }) => {
     return <>{parseText(text)}</>;
 };
 
-// Line-by-line feedback component with LLM suggestions
+// Line-by-line feedback component
 const TranscriptFeedback = ({ transcript, feedback }) => {
     if (!transcript || !feedback?.lineAnalysis || feedback.lineAnalysis.length === 0) {
         return (
@@ -76,7 +105,6 @@ const TranscriptFeedback = ({ transcript, feedback }) => {
                             {item.feedback}
                         </p>
                     </div>
-                    {/* Show suggestion for improvement items */}
                     {item.type === 'improve' && item.suggestion && (
                         <div className="mt-2 p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
                             <p className="text-xs text-cyan-300">
@@ -96,20 +124,27 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
     const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
     const [messages, setMessages] = useState([]);
     const [timer, setTimer] = useState(0);
+    const [meetingTimer, setMeetingTimer] = useState(0);
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [lastResult, setLastResult] = useState(null);
     const [allResults, setAllResults] = useState([]);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [showChat, setShowChat] = useState(true);
+    const [theme, setTheme] = useState(() => localStorage.getItem('interview_theme') || 'meet');
+    
     const timerRef = useRef(null);
-
-    // Recording Refs
+    const meetingTimerRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
     const videoPreviewRef = useRef(null);
     const streamRef = useRef(null);
     const chatContainerRef = useRef(null);
 
-    // Get user profile from localStorage if not passed
+    const currentTheme = THEMES[theme];
+
+    // Get user profile
     const savedUser = localStorage.getItem('user');
     const userData = savedUser ? JSON.parse(savedUser) : {};
     const profile = userProfile || {
@@ -119,25 +154,25 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
         salary: userData?.salary_expectation || ''
     };
 
-    // Generate line-by-line feedback from transcript
+    // Save theme preference
+    const handleThemeChange = (newTheme) => {
+        setTheme(newTheme);
+        localStorage.setItem('interview_theme', newTheme);
+    };
+
+    // Generate line-by-line feedback
     const generateLineFeedback = (transcript, analysisData) => {
         if (!transcript) return null;
         
-        // Split transcript into sentences
         const sentences = transcript.split(/(?<=[.!?])\s+/).filter(s => s.trim());
-        
         if (sentences.length === 0) return null;
 
         const lineAnalysis = sentences.map((sentence, idx) => {
             const lowerSentence = sentence.toLowerCase();
             
-            // Check for positive indicators
             const hasSpecifics = /\d+|specifically|for example|such as|instance/i.test(sentence);
             const hasAction = /i (led|created|developed|implemented|managed|achieved|improved|built)/i.test(sentence);
             const hasResult = /result|outcome|impact|increased|decreased|saved|reduced|grew/i.test(sentence);
-            
-            // Check for areas to improve
-            // Note: "like" is only flagged when used as a filler (not in comparisons like "something like X")
             const hasFillers = /\b(um|uh|you know|basically|actually|literally)\b/i.test(sentence) ||
                                /\blike,?\s+(um|uh|so|you know)\b/i.test(sentence) ||
                                /^(like|so like)\b/i.test(sentence.trim());
@@ -145,54 +180,27 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
             const startsWeak = /^(so|well|i mean|i think)/i.test(sentence);
             
             if (hasFillers) {
-                return {
-                    text: sentence,
-                    type: 'improve',
-                    feedback: 'Try to minimize filler words for more confident delivery.'
-                };
+                return { text: sentence, type: 'improve', feedback: 'Try to minimize filler words for more confident delivery.' };
             } else if (hasAction && hasResult) {
-                return {
-                    text: sentence,
-                    type: 'good',
-                    feedback: 'Excellent! You used action verbs and mentioned results.'
-                };
+                return { text: sentence, type: 'good', feedback: 'Excellent! You used action verbs and mentioned results.' };
             } else if (hasSpecifics) {
-                return {
-                    text: sentence,
-                    type: 'good',
-                    feedback: 'Great use of specific details and examples.'
-                };
+                return { text: sentence, type: 'good', feedback: 'Great use of specific details and examples.' };
             } else if (isVague && startsWeak) {
-                return {
-                    text: sentence,
-                    type: 'improve',
-                    feedback: 'Consider starting with a stronger, more direct statement.'
-                };
+                return { text: sentence, type: 'improve', feedback: 'Consider starting with a stronger, more direct statement.' };
             } else if (hasAction) {
-                return {
-                    text: sentence,
-                    type: 'good',
-                    feedback: 'Good use of action verbs to describe your contributions.'
-                };
+                return { text: sentence, type: 'good', feedback: 'Good use of action verbs to describe your contributions.' };
             } else {
-                return {
-                    text: sentence,
-                    type: 'neutral',
-                    feedback: 'Consider adding specific metrics or examples here.'
-                };
+                return { text: sentence, type: 'neutral', feedback: 'Consider adding specific metrics or examples here.' };
             }
         });
 
-        // Limit to first 4 most relevant items
         const goodItems = lineAnalysis.filter(i => i.type === 'good').slice(0, 2);
         const improveItems = lineAnalysis.filter(i => i.type === 'improve').slice(0, 2);
         
-        return {
-            lineAnalysis: [...goodItems, ...improveItems].slice(0, 4)
-        };
+        return { lineAnalysis: [...goodItems, ...improveItems].slice(0, 4) };
     };
 
-    // Fetch LLM-generated questions on mount
+    // Fetch questions on mount
     useEffect(() => {
         const fetchQuestions = async () => {
             setIsLoadingQuestions(true);
@@ -217,7 +225,6 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                         isQuestion: true
                     }]);
                 } else {
-                    // Fallback questions
                     const fallbackQuestions = [
                         { id: 1, question: "Tell me about yourself and your experience.", topic: "Introduction" },
                         { id: 2, question: "What are your key strengths?", topic: "Behavioral" },
@@ -258,6 +265,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
         }
     }, [messages]);
 
+    // Recording timer
     useEffect(() => {
         if (isRecording) {
             timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
@@ -267,6 +275,12 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
         }
         return () => clearInterval(timerRef.current);
     }, [isRecording]);
+
+    // Meeting timer
+    useEffect(() => {
+        meetingTimerRef.current = setInterval(() => setMeetingTimer(t => t + 1), 1000);
+        return () => clearInterval(meetingTimerRef.current);
+    }, []);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -323,7 +337,6 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     const data = await response.json();
                     const transcript = data.transcript || "(No speech detected)";
                     
-                    // Use backend line-by-line analysis if available, else fallback to client-side
                     let lineFeedback;
                     if (data.lineAnalysis && data.lineAnalysis.length > 0) {
                         lineFeedback = { lineAnalysis: data.lineAnalysis };
@@ -331,19 +344,16 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                         lineFeedback = generateLineFeedback(transcript, data);
                     }
                     
-                    // Add user's transcribed response with feedback
                     setMessages(prev => [...prev, { 
                         role: 'user', 
                         text: transcript,
                         feedback: lineFeedback
                     }]);
 
-                    // Store result
                     const resultWithQuestion = { ...data, question: currentQuestion };
                     setAllResults(prev => [...prev, resultWithQuestion]);
                     setLastResult(data);
 
-                    // Go directly to next question (no score message in between)
                     setTimeout(() => {
                         if (!isLastQuestion) {
                             const nextQ = questions[currentQuestionIndex + 1];
@@ -354,7 +364,6 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                             }]);
                             setCurrentQuestionIndex(prev => prev + 1);
                         } else {
-                            // Calculate average score
                             const avgScore = Math.round(
                                 allResults.reduce((sum, r) => sum + (r.overallScore || 0), data.overallScore || 0) / 
                                 (allResults.length + 1)
@@ -363,7 +372,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                             
                             setMessages(prev => [...prev, { 
                                 role: 'ai', 
-                                text: `${scoreColor} **Interview Complete!**\n\n🎉 You've answered all ${questions.length} questions.\n\n**Average Score: ${avgScore}/100**\n\nClick **"View Results"** for detailed analysis.`
+                                text: `${scoreColor} **Interview Complete!**\n\n🎉 You've answered all ${questions.length} questions.\n\n**Average Score: ${avgScore}/100**\n\nClick **"End Call"** for detailed analysis.`
                             }]);
                         }
                     }, 300);
@@ -415,165 +424,328 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
             ...lastResult,
             allResults: allResults,
             questionsCompleted: allResults.length,
-            totalQuestions: questions.length
+            totalQuestions: questions.length,
+            duration: meetingTimer
         } : null;
         onEndQuestion(summaryResult);
     };
 
     const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
+        if (hrs > 0) {
+            return `${hrs}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
     if (isLoadingQuestions) {
         return (
-            <div className="flex h-full items-center justify-center animate-fade-in-up">
+            <div className={`flex h-full items-center justify-center ${currentTheme.bg}`}>
                 <div className="text-center">
                     <Loader2 size={48} className="animate-spin text-cyan-400 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-white mb-2">Preparing Your Interview</h3>
-                    <p className="text-slate-400">Generating personalized questions for {profile.role}...</p>
+                    <p className={currentTheme.textMuted}>Generating personalized questions for {profile.role}...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-full animate-fade-in-up">
-            {/* Left Panel: Video Preview - LARGER */}
-            <div className="w-2/5 bg-slate-900/50 border-r border-slate-700/50 p-6 flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-
-                <div className="flex justify-between items-center mb-4">
-                    <div className="bg-slate-800/80 px-3 py-1.5 rounded-full text-xs font-mono text-slate-300 flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`}></div>
-                        {isRecording ? 'RECORDING' : isProcessing ? 'ANALYZING...' : 'READY'}
+        <div className={`flex flex-col h-full ${currentTheme.bg}`}>
+            {/* Top Bar - Meeting Info */}
+            <div className={`h-14 flex items-center justify-between px-4 border-b ${currentTheme.border}`}>
+                <div className="flex items-center gap-4">
+                    {/* Theme Switcher */}
+                    <div className="flex items-center gap-1 bg-black/20 rounded-full p-1">
+                        <button
+                            onClick={() => handleThemeChange('meet')}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                                theme === 'meet' 
+                                    ? 'bg-blue-500 text-white' 
+                                    : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            Google Meet
+                        </button>
+                        <button
+                            onClick={() => handleThemeChange('zoom')}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                                theme === 'zoom' 
+                                    ? 'bg-[#0e72ed] text-white' 
+                                    : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            Zoom
+                        </button>
                     </div>
-                    <div className="bg-slate-800/80 px-4 py-1.5 rounded-full text-sm font-mono text-cyan-400 font-bold">
-                        {formatTime(timer)}
-                    </div>
+                    <div className="h-6 w-px bg-gray-600"></div>
+                    <span className={`text-sm font-medium ${currentTheme.text}`}>
+                        Mock Interview Session
+                    </span>
+                    <span className={`text-xs ${currentTheme.textMuted}`}>
+                        | {profile.role} Interview
+                    </span>
                 </div>
-
-                {/* Video Preview - MUCH LARGER */}
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="relative w-full max-w-md aspect-[4/5] rounded-2xl overflow-hidden bg-black border-2 border-slate-700 shadow-2xl">
-                        <video
-                            ref={videoPreviewRef}
-                            autoPlay
-                            muted
-                            playsInline
-                            className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isRecording ? 'opacity-100' : 'opacity-40 grayscale'}`}
-                        />
-                        {!isRecording && !isProcessing && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                <div className="w-24 h-24 rounded-full bg-cyan-500/20 flex items-center justify-center animate-pulse border-2 border-cyan-500/30">
-                                    <Video size={40} className="text-cyan-400" />
-                                </div>
-                            </div>
-                        )}
-                        {isRecording && (
-                            <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/30 backdrop-blur-sm border border-red-500/50 px-3 py-1.5 rounded-lg">
-                                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-bold text-white">REC</span>
-                            </div>
-                        )}
-                        {isProcessing && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                                <div className="text-center">
-                                    <RefreshCw size={40} className="animate-spin text-cyan-400 mx-auto mb-2" />
-                                    <span className="text-sm text-cyan-400">Analyzing...</span>
-                                </div>
-                            </div>
-                        )}
+                
+                <div className="flex items-center gap-4">
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${currentTheme.buttonBg}`}>
+                        <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                        <span className={`text-sm font-mono ${currentTheme.text}`}>{formatTime(meetingTimer)}</span>
                     </div>
-                </div>
-
-                <div className="text-center mt-4">
-                    <h3 className="text-white font-bold text-lg">{profile.name}</h3>
-                    <p className="text-cyan-400 text-sm">{profile.role}</p>
-                    <p className="text-slate-500 text-xs mt-1">
-                        Question {currentQuestionIndex + 1} of {questions.length}
-                    </p>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${currentTheme.buttonBg}`}>
+                        <Users size={16} className={currentTheme.textMuted} />
+                        <span className={`text-sm ${currentTheme.text}`}>2</span>
+                    </div>
+                    {theme === 'meet' && (
+                        <button className={`p-2 rounded-full ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                            <Shield size={18} className={currentTheme.textMuted} />
+                        </button>
+                    )}
+                    <button className={`p-2 rounded-full ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                        <Settings size={18} className={currentTheme.textMuted} />
+                    </button>
                 </div>
             </div>
 
-            {/* Right Panel: Chat & Controls */}
-            <div className="w-3/5 flex flex-col bg-slate-950">
-                <div 
-                    ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"
-                >
-                    {messages.map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[90%] p-5 rounded-2xl shadow-lg ${
-                                msg.role === 'user' 
-                                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-tr-none' 
-                                    : msg.isQuestion
-                                    ? 'bg-gradient-to-br from-slate-800 to-slate-900 text-slate-100 rounded-tl-none border border-cyan-500/30'
-                                    : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
-                            }`}>
-                                {msg.role === 'user' && msg.feedback ? (
-                                    <TranscriptFeedback transcript={msg.text} feedback={msg.feedback} />
-                                ) : (
-                                    <div className="leading-relaxed text-base">
-                                        <FormattedText text={msg.text} />
+            {/* Main Content Area */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Video Area */}
+                <div className={`flex-1 flex flex-col ${showChat ? '' : ''}`}>
+                    {/* Video Grid */}
+                    <div className="flex-1 p-4 flex gap-4">
+                        {/* AI Interviewer Video (Main) */}
+                        <div className={`flex-1 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border}`}>
+                            {/* AI Avatar/Placeholder */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-center">
+                                    <div className={`w-24 h-24 mx-auto rounded-full ${theme === 'meet' ? 'bg-blue-600' : 'bg-[#0e72ed]'} flex items-center justify-center mb-4`}>
+                                        <span className="text-4xl font-bold text-white">AI</span>
+                                    </div>
+                                    <p className={`text-lg font-medium ${currentTheme.text}`}>AI Interviewer</p>
+                                    <p className={`text-sm ${currentTheme.textMuted}`}>Listening...</p>
+                                </div>
+                            </div>
+                            
+                            {/* Question Overlay */}
+                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                                <p className={`text-sm ${currentTheme.textMuted} mb-1`}>Question {currentQuestionIndex + 1} of {questions.length}</p>
+                                <p className={`text-lg font-medium ${currentTheme.text} line-clamp-2`}>
+                                    {currentQuestion?.question || "Loading question..."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Self View (Picture-in-Picture style) */}
+                        <div className={`w-72 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border}`}>
+                            <video
+                                ref={videoPreviewRef}
+                                autoPlay
+                                muted
+                                playsInline
+                                className={`w-full h-full object-cover transform scale-x-[-1] ${isRecording ? 'opacity-100' : 'opacity-60'}`}
+                            />
+                            
+                            {/* Status Overlay */}
+                            <div className="absolute top-3 left-3 flex items-center gap-2">
+                                {isRecording && (
+                                    <div className="flex items-center gap-2 bg-red-500/90 backdrop-blur-sm px-2 py-1 rounded-lg">
+                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                        <span className="text-xs font-bold text-white">REC {formatTime(timer)}</span>
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    ))}
-                    {isProcessing && (
-                        <div className="flex justify-start">
-                            <div className="bg-slate-800 text-slate-200 rounded-2xl rounded-tl-none border border-slate-700 p-4 flex items-center gap-3">
-                                <RefreshCw className="animate-spin text-cyan-400" size={18} />
-                                <span className="text-slate-400">Analyzing your response...</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
-                {/* Controls */}
-                <div className="h-28 bg-slate-900 border-t border-slate-800 p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1">
-                        <button
-                            onClick={toggleRecording}
-                            disabled={isProcessing}
-                            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all transform hover:scale-105 ${
-                                isRecording 
-                                    ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/40' 
-                                    : 'bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/40'
-                            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            {isRecording ? <Square fill="white" size={24} /> : <Mic fill="white" size={28} />}
-                        </button>
-                        {/* Recording Timer Display */}
-                        <div className={`min-w-[70px] px-3 py-2 rounded-lg font-mono text-lg font-bold flex items-center gap-2 ${
-                            isRecording 
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                                : 'bg-slate-800/80 text-cyan-400 border border-slate-700'
-                        }`}>
-                            {isRecording && (
-                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                            {/* Name Badge */}
+                            <div className="absolute bottom-3 left-3 right-3">
+                                <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm px-3 py-2 rounded-lg">
+                                    <span className={`text-sm font-medium ${currentTheme.text}`}>{profile.name}</span>
+                                    {isMuted && <MicOff size={14} className="text-red-400" />}
+                                </div>
+                            </div>
+
+                            {/* Processing Overlay */}
+                            {isProcessing && (
+                                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                                    <div className="text-center">
+                                        <RefreshCw size={32} className="animate-spin text-cyan-400 mx-auto mb-2" />
+                                        <span className="text-sm text-white">Analyzing...</span>
+                                    </div>
+                                </div>
                             )}
-                            <span>{formatTime(timer)}</span>
-                        </div>
-                        <div className="flex-1">
-                            <div className="h-10 w-full max-w-xs"><AudioVisualizer isActive={isRecording} /></div>
-                            <p className="text-xs text-slate-500 mt-1">
-                                {isRecording ? 'Recording... Click to stop' : 'Click microphone to start recording'}
-                            </p>
+
+                            {/* Camera Off Placeholder */}
+                            {!isRecording && !isProcessing && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                    <div className="text-center">
+                                        <div className={`w-16 h-16 mx-auto rounded-full ${currentTheme.buttonBg} flex items-center justify-center mb-2`}>
+                                            <Video size={24} className={currentTheme.textMuted} />
+                                        </div>
+                                        <p className={`text-xs ${currentTheme.textMuted}`}>Click mic to start</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <Button 
-                        variant={isLastQuestion && lastResult ? "primary" : "secondary"} 
-                        onClick={handleFinish} 
-                        icon={ArrowRight}
-                        disabled={isRecording || isProcessing}
-                        className="px-6"
-                    >
-                        {isLastQuestion && lastResult ? "View Results" : "End Interview"}
-                    </Button>
+
+                    {/* Bottom Controls Bar */}
+                    <div className={`h-20 flex items-center justify-center gap-3 ${currentTheme.controlsBg} border-t ${currentTheme.border}`}>
+                        {/* Left Controls */}
+                        <div className="flex items-center gap-2">
+                            {/* Mic Button */}
+                            <button
+                                onClick={toggleRecording}
+                                disabled={isProcessing}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                                    isRecording 
+                                        ? 'bg-red-500 hover:bg-red-600' 
+                                        : `${currentTheme.buttonBg} ${currentTheme.buttonHover}`
+                                } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                {isRecording ? (
+                                    <Square size={20} fill="white" className="text-white" />
+                                ) : (
+                                    <Mic size={20} className={isRecording ? 'text-white' : currentTheme.textMuted} />
+                                )}
+                            </button>
+                            
+                            {/* Video Button */}
+                            <button
+                                onClick={() => setIsVideoOff(!isVideoOff)}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}
+                            >
+                                {isVideoOff ? (
+                                    <VideoOff size={20} className="text-red-400" />
+                                ) : (
+                                    <Video size={20} className={currentTheme.textMuted} />
+                                )}
+                            </button>
+
+                            {theme === 'zoom' && (
+                                <>
+                                    <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                        <Monitor size={20} className={currentTheme.textMuted} />
+                                    </button>
+                                    <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                        <Grid size={20} className={currentTheme.textMuted} />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Recording Status */}
+                        <div className={`px-4 py-2 rounded-full ${isRecording ? 'bg-red-500/20 border border-red-500/30' : 'bg-black/20'}`}>
+                            <div className="flex items-center gap-3">
+                                {isRecording && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>}
+                                <span className={`text-sm font-medium ${isRecording ? 'text-red-400' : currentTheme.textMuted}`}>
+                                    {isRecording ? 'Recording...' : isProcessing ? 'Processing...' : 'Ready to record'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Right Controls */}
+                        <div className="flex items-center gap-2">
+                            {/* Chat Toggle */}
+                            <button
+                                onClick={() => setShowChat(!showChat)}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                    showChat ? currentTheme.accent : currentTheme.buttonBg
+                                } ${currentTheme.buttonHover}`}
+                            >
+                                <MessageSquare size={20} className={showChat ? 'text-white' : currentTheme.textMuted} />
+                            </button>
+
+                            {/* More Options */}
+                            <button className={`w-12 h-12 rounded-full flex items-center justify-center ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                <MoreVertical size={20} className={currentTheme.textMuted} />
+                            </button>
+
+                            {/* End Call */}
+                            <button
+                                onClick={handleFinish}
+                                disabled={isRecording || isProcessing}
+                                className={`px-6 h-12 rounded-full flex items-center gap-2 ${currentTheme.endCall} transition-all ${
+                                    (isRecording || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                            >
+                                <Phone size={18} className="text-white rotate-[135deg]" />
+                                <span className="text-white font-medium">
+                                    {isLastQuestion && lastResult ? 'View Results' : 'End Call'}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Chat/Transcript Panel */}
+                {showChat && (
+                    <div className={`w-96 flex flex-col border-l ${currentTheme.border} ${currentTheme.chatBg}`}>
+                        <div className={`h-14 flex items-center justify-between px-4 border-b ${currentTheme.border}`}>
+                            <span className={`font-medium ${currentTheme.text}`}>Meeting Chat</span>
+                            <button onClick={() => setShowChat(false)} className={`p-2 rounded-full ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>
+                                <Maximize2 size={16} className={currentTheme.textMuted} />
+                            </button>
+                        </div>
+                        
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`${msg.role === 'user' ? 'pl-4' : ''}`}>
+                                    <div className="flex items-start gap-3">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            msg.role === 'user' 
+                                                ? 'bg-green-600' 
+                                                : theme === 'meet' ? 'bg-blue-600' : 'bg-[#0e72ed]'
+                                        }`}>
+                                            <span className="text-xs font-bold text-white">
+                                                {msg.role === 'user' ? profile.name?.charAt(0) || 'U' : 'AI'}
+                                            </span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-sm font-medium ${currentTheme.text}`}>
+                                                    {msg.role === 'user' ? profile.name : 'AI Interviewer'}
+                                                </span>
+                                                <span className={`text-xs ${currentTheme.textMuted}`}>
+                                                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            <div className={`text-sm ${currentTheme.text} leading-relaxed`}>
+                                                {msg.role === 'user' && msg.feedback ? (
+                                                    <TranscriptFeedback transcript={msg.text} feedback={msg.feedback} />
+                                                ) : (
+                                                    <FormattedText text={msg.text} />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            {isProcessing && (
+                                <div className="flex items-start gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${theme === 'meet' ? 'bg-blue-600' : 'bg-[#0e72ed]'}`}>
+                                        <span className="text-xs font-bold text-white">AI</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 p-3 rounded-lg bg-black/20">
+                                        <RefreshCw className="animate-spin text-cyan-400" size={14} />
+                                        <span className={currentTheme.textMuted}>Analyzing your response...</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Audio Visualizer */}
+                        {isRecording && (
+                            <div className={`h-16 px-4 border-t ${currentTheme.border} flex items-center gap-3`}>
+                                <div className="flex-1">
+                                    <AudioVisualizer isActive={isRecording} />
+                                </div>
+                                <span className={`text-xs ${currentTheme.textMuted}`}>Listening...</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

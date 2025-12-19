@@ -1,64 +1,144 @@
 import React, { useState, useEffect } from 'react';
-import { Flame, Upload, Award, Zap, ArrowRight, BarChart, Clock, Video, TrendingUp, Target, CheckCircle } from 'lucide-react';
+import { Flame, Upload, Award, Zap, ArrowRight, BarChart, Clock, Video, TrendingUp, Target, CheckCircle, RefreshCw, FileText, ChevronRight } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { API_URL } from '../config';
 
 const DashboardView = ({ onNavigate, user }) => {
     // Get user data from localStorage for complete profile
     const savedUser = localStorage.getItem('user');
     const userData = savedUser ? JSON.parse(savedUser) : {};
+    const userId = userData?.uid;
     
     // Get interview history from localStorage
     const [history, setHistory] = useState([]);
     const [streak, setStreak] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [resumeScore, setResumeScore] = useState(null);
     const [stats, setStats] = useState({
         totalInterviews: 0,
         avgScore: 0,
         readinessScore: 0,
         technicalScore: 0,
         communicationScore: 0,
-        problemSolvingScore: 0
+        problemSolvingScore: 0,
+        improvement: 0
     });
     
     useEffect(() => {
-        // Load interview history
-        try {
-            const savedHistory = JSON.parse(localStorage.getItem('interview_history') || '[]');
-            setHistory(savedHistory);
-            
-            // Load streak
-            const savedStreak = parseInt(localStorage.getItem('practice_streak') || '0');
-            setStreak(savedStreak);
-            
-            // Calculate stats
-            if (savedHistory.length > 0) {
-                const totalInterviews = savedHistory.length;
-                const avgScore = Math.round(
-                    savedHistory.reduce((sum, h) => sum + (h.overallScore || 0), 0) / totalInterviews
-                );
-                const avgVisual = Math.round(
-                    savedHistory.reduce((sum, h) => sum + (h.visualScore || 0), 0) / totalInterviews
-                );
-                const avgContent = Math.round(
-                    savedHistory.reduce((sum, h) => sum + (h.contentScore || 0), 0) / totalInterviews
-                );
-                const avgSpeech = Math.round(
-                    savedHistory.reduce((sum, h) => sum + (h.speechScore || 0), 0) / totalInterviews
-                );
-                
-                setStats({
-                    totalInterviews,
-                    avgScore,
-                    readinessScore: avgScore,
-                    // Map scores to skill categories
-                    technicalScore: avgContent,
-                    communicationScore: avgSpeech,
-                    problemSolvingScore: avgVisual
-                });
+        const fetchData = async () => {
+            // First try to fetch from backend
+            if (userId) {
+                try {
+                    const response = await fetch(`${API_URL}/interviews/${userId}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.interviews) {
+                        const interviews = data.interviews;
+                        setHistory(interviews);
+                        localStorage.setItem('interview_history', JSON.stringify(interviews));
+                        
+                        // Calculate stats from backend data
+                        if (interviews.length > 0) {
+                            const totalInterviews = interviews.length;
+                            const avgScore = Math.round(
+                                interviews.reduce((sum, h) => sum + (h.overall_score || h.overallScore || 0), 0) / totalInterviews
+                            );
+                            const avgVisual = Math.round(
+                                interviews.reduce((sum, h) => sum + (h.visual_score || h.visualScore || 0), 0) / totalInterviews
+                            );
+                            const avgContent = Math.round(
+                                interviews.reduce((sum, h) => sum + (h.content_score || h.contentScore || 0), 0) / totalInterviews
+                            );
+                            const avgSpeech = Math.round(
+                                interviews.reduce((sum, h) => sum + (h.speech_score || h.speechScore || 0), 0) / totalInterviews
+                            );
+                            
+                            // Calculate improvement
+                            let improvement = 0;
+                            if (interviews.length >= 2) {
+                                const latest = interviews[0].overall_score || interviews[0].overallScore || 0;
+                                const previous = interviews[1].overall_score || interviews[1].overallScore || 0;
+                                improvement = latest - previous;
+                            }
+                            
+                            setStats({
+                                totalInterviews,
+                                avgScore,
+                                readinessScore: avgScore,
+                                technicalScore: avgContent,
+                                communicationScore: avgSpeech,
+                                problemSolvingScore: avgVisual,
+                                improvement
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching from backend:', error);
+                    // Fall through to localStorage
+                }
             }
-        } catch (e) {
-            console.error('Error loading interview history:', e);
-        }
-    }, []);
+            
+            // Load from localStorage as fallback (always try this)
+            try {
+                const savedHistory = JSON.parse(localStorage.getItem('interview_history') || '[]');
+                console.log('Loaded from localStorage:', savedHistory.length, 'interviews');
+                
+                // Only use localStorage if we didn't get data from backend
+                if (savedHistory.length > 0) {
+                    setHistory(prev => prev.length > 0 ? prev : savedHistory);
+                    
+                    // Always recalculate stats from whatever data we have
+                    const historyToUse = savedHistory;
+                    const totalInterviews = historyToUse.length;
+                    const avgScore = Math.round(
+                        historyToUse.reduce((sum, h) => sum + (h.overallScore || h.overall_score || 0), 0) / totalInterviews
+                    );
+                    const avgVisual = Math.round(
+                        historyToUse.reduce((sum, h) => sum + (h.visualScore || h.visual_score || 0), 0) / totalInterviews
+                    );
+                    const avgContent = Math.round(
+                        historyToUse.reduce((sum, h) => sum + (h.contentScore || h.content_score || 0), 0) / totalInterviews
+                    );
+                    const avgSpeech = Math.round(
+                        historyToUse.reduce((sum, h) => sum + (h.speechScore || h.speech_score || 0), 0) / totalInterviews
+                    );
+                    
+                    console.log('Calculated stats:', { totalInterviews, avgScore, avgVisual, avgContent, avgSpeech });
+                    
+                    setStats({
+                        totalInterviews,
+                        avgScore,
+                        readinessScore: avgScore,
+                        technicalScore: avgContent,
+                        communicationScore: avgSpeech,
+                        problemSolvingScore: avgVisual,
+                        improvement: 0
+                    });
+                }
+                
+                // Load streak
+                const savedStreak = parseInt(localStorage.getItem('practice_streak') || '0');
+                setStreak(savedStreak);
+                
+                // Load resume score
+                const savedResume = localStorage.getItem('resume_data');
+                if (savedResume) {
+                    try {
+                        const resumeData = JSON.parse(savedResume);
+                        setResumeScore(resumeData.atsScore || null);
+                    } catch (e) {
+                        console.error('Error parsing resume data:', e);
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading interview history:', e);
+            }
+            
+            setLoading(false);
+        };
+
+        fetchData();
+    }, [userId]);
     
     const safeName =
         user?.name ||
@@ -70,7 +150,10 @@ const DashboardView = ({ onNavigate, user }) => {
     
     // Format date for history display
     const formatDate = (dateStr) => {
+        if (!dateStr) return 'Recently';
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'Recently';
+        
         const now = new Date();
         const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
         
@@ -200,35 +283,100 @@ const DashboardView = ({ onNavigate, user }) => {
                     </p>
                 </div>
 
+                {/* Resume ATS Score Widget */}
+                <div 
+                    onClick={() => onNavigate('resume-upload')}
+                    className="col-span-1 bg-slate-900/50 border border-slate-800 rounded-3xl p-6 relative overflow-hidden cursor-pointer group hover:border-cyan-500/50 transition-all"
+                >
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-slate-300">Resume Score</h4>
+                        <FileText size={18} className="text-cyan-400" />
+                    </div>
+                    
+                    {resumeScore !== null ? (
+                        <div className="flex flex-col items-center">
+                            {/* Score Circle */}
+                            <div className="relative w-24 h-24 mb-3">
+                                <svg className="w-full h-full transform -rotate-90">
+                                    <circle cx="48" cy="48" r="40" stroke="#1e293b" strokeWidth="6" fill="transparent" />
+                                    <circle
+                                        cx="48" cy="48" r="40"
+                                        stroke={resumeScore >= 80 ? '#4ade80' : resumeScore >= 60 ? '#facc15' : '#f87171'}
+                                        strokeWidth="6"
+                                        fill="transparent"
+                                        strokeDasharray="251"
+                                        strokeDashoffset={251 - (251 * resumeScore) / 100}
+                                        strokeLinecap="round"
+                                        className="transition-all duration-1000"
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className={`text-2xl font-bold ${
+                                        resumeScore >= 80 ? 'text-green-400' : resumeScore >= 60 ? 'text-yellow-400' : 'text-red-400'
+                                    }`}>{resumeScore}</span>
+                                </div>
+                            </div>
+                            <p className={`text-sm font-medium ${
+                                resumeScore >= 80 ? 'text-green-400' : resumeScore >= 60 ? 'text-yellow-400' : 'text-red-400'
+                            }`}>
+                                {resumeScore >= 80 ? 'Excellent' : resumeScore >= 60 ? 'Good' : resumeScore >= 40 ? 'Needs Work' : 'Critical'}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">ATS Compatibility</p>
+                            <div className="flex items-center gap-1 mt-3 text-xs text-cyan-400 group-hover:gap-2 transition-all">
+                                <span>Update Resume</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center py-4">
+                            <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-3">
+                                <Upload size={24} className="text-slate-500" />
+                            </div>
+                            <p className="text-slate-400 text-sm text-center mb-2">No resume analyzed</p>
+                            <div className="flex items-center gap-1 text-xs text-cyan-400 group-hover:gap-2 transition-all">
+                                <span>Upload Resume</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Recent History */}
                 <div className="col-span-1 bg-slate-900/50 border border-slate-800 rounded-3xl p-6 flex flex-col">
-                    <h4 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Clock size={16} /> Recent History</h4>
+                    <h4 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Clock size={16} /> Recent Interviews</h4>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {history.length > 0 ? (
                             <div className="space-y-3">
-                                {history.slice(0, 5).map((item, idx) => (
-                                    <div key={item.id || idx} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                                item.overallScore >= 70 ? 'bg-green-500/20' :
-                                                item.overallScore >= 50 ? 'bg-yellow-500/20' : 'bg-red-500/20'
-                                            }`}>
-                                                {item.overallScore >= 70 ? (
-                                                    <CheckCircle size={18} className="text-green-400" />
-                                                ) : (
-                                                    <Target size={18} className={item.overallScore >= 50 ? 'text-yellow-400' : 'text-red-400'} />
-                                                )}
+                                {history.slice(0, 3).map((item, idx) => {
+                                    // Handle both snake_case and camelCase
+                                    const score = item.overallScore || item.overall_score || 0;
+                                    const date = item.date || item.session_date;
+                                    const difficulty = item.difficulty || 'Interview';
+                                    
+                                    return (
+                                        <div key={item.id || idx} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                                    score >= 70 ? 'bg-green-500/20' :
+                                                    score >= 50 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+                                                }`}>
+                                                    {score >= 70 ? (
+                                                        <CheckCircle size={18} className="text-green-400" />
+                                                    ) : (
+                                                        <Target size={18} className={score >= 50 ? 'text-yellow-400' : 'text-red-400'} />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-white font-medium capitalize">{difficulty}</p>
+                                                    <p className="text-xs text-slate-500">{formatDate(date)}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm text-white font-medium capitalize">{item.difficulty || 'Interview'}</p>
-                                                <p className="text-xs text-slate-500">{formatDate(item.date)}</p>
-                                            </div>
+                                            <span className={`text-lg font-bold ${getScoreColor(score)}`}>
+                                                {score}%
+                                            </span>
                                         </div>
-                                        <span className={`text-lg font-bold ${getScoreColor(item.overallScore)}`}>
-                                            {item.overallScore}%
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="flex-1 flex items-center justify-center">

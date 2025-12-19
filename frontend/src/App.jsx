@@ -36,38 +36,110 @@ const App = () => {
   const [pendingEmail, setPendingEmail] = useState("");
   const [interviewResult, setInterviewResult] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState('intermediate');
+  const [interviewHistory, setInterviewHistory] = useState([]);
+  const [performanceData, setPerformanceData] = useState(null);
+
+  // Fetch complete user data from backend
+  const fetchUserData = async (userId) => {
+    try {
+      const response = await fetch(`${API_URL}/user/complete-data/${userId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // Store interview history
+        if (data.data.interviews) {
+          setInterviewHistory(data.data.interviews);
+          localStorage.setItem('interview_history', JSON.stringify(data.data.interviews));
+        }
+        
+        // Store resume data
+        if (data.data.resume) {
+          setResumeData(data.data.resume);
+          localStorage.setItem('resume_data', JSON.stringify(data.data.resume));
+        }
+        
+        // Store performance data
+        if (data.data.performance) {
+          setPerformanceData(data.data.performance);
+          localStorage.setItem('performance_data', JSON.stringify(data.data.performance));
+        }
+        
+        // Update profile if available
+        if (data.data.profile) {
+          const profile = data.data.profile;
+          setUserProfile({
+            name: profile.name || '',
+            role: profile.role || '',
+            experience: profile.experience_years || '',
+            salary: profile.salary_expectation || '',
+            email: profile.email || ''
+          });
+        }
+        
+        return data.data;
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+    return null;
+  };
 
   // Check for existing session on load
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        setUserProfile({
-          name: userData.name || '',
-          role: userData.role || '',
-          experience: userData.experience_years || '',
-          salary: userData.salary_expectation || '',
-          email: userData.email || ''
-        });
-        
-        // Go to dashboard if profile is complete, otherwise profile setup
-        if (userData.profile_completed || userData.name) {
-          setView('dashboard');
-        } else {
-          setView('profile-setup');
+    const loadUserSession = async () => {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          setUserProfile({
+            name: userData.name || '',
+            role: userData.role || '',
+            experience: userData.experience_years || '',
+            salary: userData.salary_expectation || '',
+            email: userData.email || ''
+          });
+          
+          // Fetch complete user data from backend
+          if (userData.uid) {
+            await fetchUserData(userData.uid);
+          }
+          
+          // Load cached data as fallback
+          const cachedHistory = localStorage.getItem('interview_history');
+          if (cachedHistory) {
+            setInterviewHistory(JSON.parse(cachedHistory));
+          }
+          
+          const cachedResume = localStorage.getItem('resume_data');
+          if (cachedResume) {
+            setResumeData(JSON.parse(cachedResume));
+          }
+          
+          const cachedPerformance = localStorage.getItem('performance_data');
+          if (cachedPerformance) {
+            setPerformanceData(JSON.parse(cachedPerformance));
+          }
+          
+          // Go to dashboard if profile is complete, otherwise profile setup
+          if (userData.profile_completed || userData.name) {
+            setView('dashboard');
+          } else {
+            setView('profile-setup');
+          }
+        } catch (e) {
+          console.error('Error parsing saved user:', e);
+          localStorage.removeItem('user');
         }
-      } catch (e) {
-        console.error('Error parsing saved user:', e);
-        localStorage.removeItem('user');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    
+    loadUserSession();
   }, []);
 
   // Handlers
-  const handleLogin = (userData) => {
+  const handleLogin = async (userData) => {
     setUser(userData);
     setUserProfile({
       name: userData.name || '',
@@ -77,6 +149,11 @@ const App = () => {
       email: userData.email || ''
     });
     
+    // Fetch complete user data from backend
+    if (userData.uid) {
+      await fetchUserData(userData.uid);
+    }
+    
     if (userData.profile_completed || userData.name) {
       setView('dashboard');
     } else {
@@ -84,10 +161,15 @@ const App = () => {
     }
   };
   
-  const handleRegisterSuccess = (userData) => {
+  const handleRegisterSuccess = async (userData) => {
     if (userData) {
       setUser(userData);
       setUserProfile({ name: userData.name, email: userData.email });
+      
+      // Initialize empty data for new user
+      setInterviewHistory([]);
+      setPerformanceData(null);
+      localStorage.setItem('interview_history', JSON.stringify([]));
     }
     setView('profile-setup');
   };
@@ -95,9 +177,14 @@ const App = () => {
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('session');
+    localStorage.removeItem('interview_history');
+    localStorage.removeItem('resume_data');
+    localStorage.removeItem('performance_data');
     setUser(null);
     setUserProfile({});
     setResumeData(null);
+    setInterviewHistory([]);
+    setPerformanceData(null);
     setView('landing');
   };
 
@@ -109,11 +196,43 @@ const App = () => {
     }
   };
 
-  const handleInterviewComplete = (result) => {
+  const handleInterviewComplete = async (result) => {
     if (result) {
       setInterviewResult(result);
       
-      // Persist interview results to localStorage
+      // Save interview to backend
+      if (user?.uid) {
+        try {
+          const formData = new FormData();
+          formData.append('user_id', user.uid);
+          formData.append('overall_score', result.overallScore || 0);
+          formData.append('visual_score', result.visualScore || 0);
+          formData.append('content_score', result.contentScore || 0);
+          formData.append('speech_score', result.speechScore || 0);
+          formData.append('difficulty', selectedDifficulty);
+          formData.append('domain', userProfile.role || 'General');
+          formData.append('duration', Math.round((result.duration || 0) / 60));
+          formData.append('questions_answered', result.questionsAnswered || result.questionsCompleted || 1);
+          
+          if (result.allResults) {
+            formData.append('questions', JSON.stringify(result.allResults));
+          }
+          
+          const response = await fetch(`${API_URL}/interview/save`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            console.log('Interview saved to database:', data.interview_id);
+          }
+        } catch (error) {
+          console.error('Error saving interview to database:', error);
+        }
+      }
+      
+      // Also persist to localStorage for offline access
       try {
         const history = JSON.parse(localStorage.getItem('interview_history') || '[]');
         const newEntry = {
@@ -126,11 +245,14 @@ const App = () => {
           speechScore: result.speechScore || 0,
           questionsAnswered: result.questionsAnswered || 1,
           duration: result.duration || 0,
-          role: userProfile.role || 'General'
+          role: userProfile.role || 'General',
+          domain: userProfile.role || 'General'
         };
-        history.unshift(newEntry); // Add to beginning
+        history.unshift(newEntry);
         // Keep only last 50 interviews
-        localStorage.setItem('interview_history', JSON.stringify(history.slice(0, 50)));
+        const trimmedHistory = history.slice(0, 50);
+        localStorage.setItem('interview_history', JSON.stringify(trimmedHistory));
+        setInterviewHistory(trimmedHistory);
         
         // Update streak
         const today = new Date().toDateString();
@@ -163,8 +285,41 @@ const App = () => {
     setView('active-interview');
   };
 
-  const handleUploadSuccess = (data) => {
-    setResumeData(data);
+  const handleUploadSuccess = (apiResponse) => {
+    // Map the nested API response to the format expected by ResumeInsightsView
+    const analysis = apiResponse?.data?.analysis || apiResponse?.analysis || {};
+    const atsData = analysis.ats_score || {};
+    
+    const mappedData = {
+      // ATS Score - extract from nested structure
+      atsScore: atsData.atsScore || analysis.overall_score || 0,
+      
+      // Skills - from analysis
+      skills: analysis.skills || atsData.matchedSkills || [],
+      
+      // Missing skills
+      missingSkills: atsData.missingSkills || [],
+      
+      // Strengths and suggestions
+      strengths: analysis.strengths || [],
+      suggestions: analysis.suggestions || [],
+      
+      // Job compatibilities
+      jobCompatibilities: analysis.job_compatibilities || [],
+      
+      // File info
+      fileName: apiResponse?.data?.file_name || apiResponse?.file_name || "Uploaded Resume",
+      
+      // Raw data for debugging
+      rawAnalysis: analysis
+    };
+    
+    console.log("Mapped resume data:", mappedData);
+    setResumeData(mappedData);
+    
+    // Also save to localStorage for persistence
+    localStorage.setItem('resume_data', JSON.stringify(mappedData));
+    
     setView('resume-insights');
   };
 
