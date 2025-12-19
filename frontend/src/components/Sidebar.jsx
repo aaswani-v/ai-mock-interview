@@ -54,19 +54,19 @@ const Sidebar = ({ currentView, setView, onLogout }) => {
                 ))}
             </div>
 
-            <div className="pt-4 border-t border-slate-800 mt-4 px-1 overflow-hidden">
+            <div className="pt-4 border-t border-slate-800 mt-4 overflow-hidden">
                 <div
                     onClick={onLogout}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-red-500/10 cursor-pointer transition-colors whitespace-nowrap group/logout"
+                    className="flex items-center justify-center group-hover:justify-start gap-3 p-2 rounded-xl hover:bg-red-500/10 cursor-pointer transition-all whitespace-nowrap group/logout"
                 >
-                    <div className="w-10 h-10 min-w-[2.5rem] rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center font-bold text-white text-sm">
+                    <div className="w-10 h-10 min-w-[2.5rem] rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center font-bold text-white text-sm flex-shrink-0">
                         {getInitials(userName)}
                     </div>
-                    <div className="flex-1 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="flex-1 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden group-hover:block">
                         <div className="text-sm font-bold text-white truncate">{userName}</div>
                         <div className="text-xs text-slate-500 group-hover/logout:text-red-400 truncate">Click to Logout</div>
                     </div>
-                    <LogOut size={16} className="text-slate-500 group-hover/logout:text-red-400 opacity-0 group-hover:opacity-100" />
+                    <LogOut size={16} className="text-slate-500 group-hover/logout:text-red-400 opacity-0 group-hover:opacity-100 hidden group-hover:block" />
                 </div>
             </div>
         </div>
