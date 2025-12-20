@@ -286,7 +286,7 @@ const AnalyticsView = () => {
                     <div className="space-y-4">
                         {recommendations.map((rec, idx) => (
                             <div key={idx} className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                                <div className="flex items-center justify-between mb-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                                     <div className="flex items-center gap-3">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                             rec.priority === 'High' ? 'bg-red-500/20 text-red-400' :
@@ -296,7 +296,7 @@ const AnalyticsView = () => {
                                         <span className="text-white font-medium">{rec.domain}</span>
                                     </div>
                                     <div className="text-sm">
-                                        <span className="text-slate-400">Current: </span>
+                                        <span className="text-slate-500 text-xs">Current: </span>
                                         <span className={`font-bold ${rec.current_score >= 70 ? 'text-green-400' : rec.current_score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
                                             {rec.current_score}%
                                         </span>

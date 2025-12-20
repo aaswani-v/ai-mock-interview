@@ -55,7 +55,7 @@ else:
 
 # Configuration from environment
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "40"))
-MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "45"))
+MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "60"))
 RATE_LIMIT = os.getenv("RATE_LIMIT_PER_MINUTE", "10/minute")
 
 # Ensure built-in ffmpeg is found if present

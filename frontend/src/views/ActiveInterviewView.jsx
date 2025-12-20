@@ -4,6 +4,9 @@ import Button from '../components/ui/Button';
 import AudioVisualizer from '../components/visuals/AudioVisualizer';
 import { API_URL } from '../config';
 
+// Maximum recording duration before backend timeout (60 seconds)
+const MAX_RECORDING_SECONDS = 60;
+
 // Theme configurations
 const THEMES = {
     meet: {
@@ -514,7 +517,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                 {/* Video Area */}
                 <div className={`flex-1 flex flex-col ${showChat ? '' : ''}`}>
                     {/* Video Grid */}
-                    <div className="flex-1 p-2 sm:p-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
+                    <div className="flex-1 p-2 sm:p-4 flex flex-row gap-2 sm:gap-4">
                         {/* AI Interviewer Video (Main) */}
                         <div className={`flex-1 relative rounded-xl overflow-hidden ${currentTheme.videoBg} border ${currentTheme.border} min-h-[200px] sm:min-h-0`}>
                             {/* AI Avatar/Placeholder */}
@@ -550,9 +553,16 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                             {/* Status Overlay */}
                             <div className="absolute top-3 left-3 flex items-center gap-2">
                                 {isRecording && (
-                                    <div className="flex items-center gap-2 bg-red-500/90 backdrop-blur-sm px-2 py-1 rounded-lg">
+                                    <div className={`flex items-center gap-2 backdrop-blur-sm px-2 py-1 rounded-lg ${
+                                        timer > MAX_RECORDING_SECONDS - 15 ? 'bg-yellow-500/90 animate-pulse' : 'bg-red-500/90'
+                                    }`}>
                                         <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                                        <span className="text-xs font-bold text-white">REC {formatTime(timer)}</span>
+                                        <span className="text-xs font-bold text-white">
+                                            {timer > MAX_RECORDING_SECONDS - 15 
+                                                ? `⏱️ ${MAX_RECORDING_SECONDS - timer}s` 
+                                                : `REC ${formatTime(timer)}`
+                                            }
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -590,7 +600,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     </div>
 
                     {/* Bottom Controls Bar */}
-                    <div className={`h-16 sm:h-20 mb-16 md:mb-0 flex items-center justify-center gap-2 sm:gap-3 ${currentTheme.controlsBg} border-t ${currentTheme.border}`}>
+                    <div className={`h-16 sm:h-20 mb-20 md:mb-0 flex items-center justify-center gap-2 sm:gap-3 ${currentTheme.controlsBg} border-t ${currentTheme.border}`}>
                         {/* Left Controls */}
                         <div className="flex items-center gap-1 sm:gap-2">
                             {/* Mic Button */}
@@ -685,7 +695,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
 
                 {/* Chat/Transcript Panel */}
                 {showChat && (
-                    <div className={`w-96 flex flex-col border-l ${currentTheme.border} ${currentTheme.chatBg}`}>
+                    <div className={`w-72 lg:w-96 hidden md:flex flex-col border-l ${currentTheme.border} ${currentTheme.chatBg}`}>
                         <div className={`h-14 flex items-center justify-between px-4 border-b ${currentTheme.border}`}>
                             <span className={`font-medium ${currentTheme.text}`}>Meeting Chat</span>
                             <button onClick={() => setShowChat(false)} className={`p-2 rounded-full ${currentTheme.buttonBg} ${currentTheme.buttonHover}`}>

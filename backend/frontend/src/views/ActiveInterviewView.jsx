@@ -1,0 +1,544 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Mic, MicOff, Square, Video, VideoOff, RefreshCw, Loader2, CheckCircle, AlertCircle, Phone, MoreVertical, Move, GripVertical, SkipForward, ChevronRight } from 'lucide-react';
+import AudioVisualizer from '../components/visuals/AudioVisualizer';
+import { API_URL } from '../config';
+
+const MAX_RECORDING_SECONDS = 60;
+
+// Landscape Orientation Prompt
+const LandscapePrompt = ({ onContinue }) => {
+    const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+
+    useEffect(() => {
+        const check = () => setIsLandscape(window.innerWidth > window.innerHeight);
+        window.addEventListener('resize', check);
+        window.addEventListener('orientationchange', check);
+        return () => { window.removeEventListener('resize', check); window.removeEventListener('orientationchange', check); };
+    }, []);
+
+    if (isLandscape || window.innerWidth >= 768) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-[#0e1621] flex items-center justify-center p-6">
+            <div className="text-center max-w-sm">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                    <span className="text-2xl">📱</span>
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">Rotate Your Device</h2>
+                <p className="text-gray-400 mb-4 text-sm">For the best interview experience, please rotate to landscape mode.</p>
+                <button onClick={onContinue} className="w-full py-3 bg-[#0e72ed] text-white rounded-xl font-medium">Continue Anyway</button>
+            </div>
+        </div>
+    );
+};
+
+// Draggable PiP Component - Optimized for all screen sizes
+const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, userName, isMuted }) => {
+    const [position, setPosition] = useState({ x: 16, y: 60 });
+    const [size, setSize] = useState({ width: 160, height: 120 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [isResizing, setIsResizing] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [initialPos, setInitialPos] = useState({ x: 0, y: 0 });
+    const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+
+    // Adjust size based on screen
+    useEffect(() => {
+        const updateSize = () => {
+            const isMobile = window.innerWidth < 768;
+            setSize(isMobile ? { width: 120, height: 90 } : { width: 180, height: 135 });
+            setPosition({ x: 16, y: 60 });
+        };
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        return () => window.removeEventListener('resize', updateSize);
+    }, []);
+
+    const handleMouseDown = useCallback((e) => {
+        if (e.target.closest('.resize-handle')) return;
+        e.preventDefault();
+        setIsDragging(true);
+        setDragStart({ x: e.clientX, y: e.clientY });
+        setInitialPos({ x: position.x, y: position.y });
+    }, [position]);
+
+    const handleMouseMove = useCallback((e) => {
+        if (isDragging) {
+            setPosition({
+                x: Math.max(8, Math.min(window.innerWidth - size.width - 8, initialPos.x + (e.clientX - dragStart.x))),
+                y: Math.max(50, Math.min(window.innerHeight - size.height - 80, initialPos.y + (e.clientY - dragStart.y)))
+            });
+        }
+        if (isResizing) {
+            setSize({
+                width: Math.max(100, Math.min(280, initialSize.width + (e.clientX - dragStart.x))),
+                height: Math.max(75, Math.min(210, initialSize.height + (e.clientY - dragStart.y)))
+            });
+        }
+    }, [isDragging, isResizing, dragStart, initialPos, initialSize, size]);
+
+    const handleMouseUp = useCallback(() => { setIsDragging(false); setIsResizing(false); }, []);
+
+    const handleResizeStart = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        setIsResizing(true);
+        setDragStart({ x: e.clientX, y: e.clientY });
+        setInitialSize({ width: size.width, height: size.height });
+    };
+
+    useEffect(() => {
+        if (isDragging || isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
+        }
+    }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+
+    const handleTouchStart = (e) => {
+        if (e.target.closest('.resize-handle')) return;
+        const touch = e.touches[0];
+        setIsDragging(true);
+        setDragStart({ x: touch.clientX, y: touch.clientY });
+        setInitialPos({ x: position.x, y: position.y });
+    };
+
+    const handleTouchMove = (e) => {
+        if (isDragging) {
+            const touch = e.touches[0];
+            setPosition({
+                x: Math.max(8, Math.min(window.innerWidth - size.width - 8, initialPos.x + (touch.clientX - dragStart.x))),
+                y: Math.max(50, Math.min(window.innerHeight - size.height - 80, initialPos.y + (touch.clientY - dragStart.y)))
+            });
+        }
+    };
+
+    return (
+        <div
+            className="fixed z-50 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 cursor-move select-none"
+            style={{ left: position.x, top: position.y, width: size.width, height: size.height }}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseUp}
+        >
+            <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" />
+            
+            {!isRecording && !isProcessing && (
+                <div className="absolute inset-0 bg-[#1a2332] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                        <span className="text-lg font-bold text-white">{userName?.charAt(0) || 'U'}</span>
+                    </div>
+                </div>
+            )}
+
+            {isRecording && (
+                <div className={`absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${timer > MAX_RECORDING_SECONDS - 15 ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                    <span className="text-white">{formatTime(timer)}</span>
+                </div>
+            )}
+
+            {isProcessing && (
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                    <RefreshCw size={18} className="animate-spin text-white" />
+                </div>
+            )}
+
+            <div className="absolute top-1 right-1 p-1 rounded bg-black/40 opacity-60 hover:opacity-100">
+                <Move size={10} className="text-white" />
+            </div>
+
+            <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 flex items-center gap-1">
+                <span className="text-white text-[10px] font-medium">{userName}</span>
+                {isMuted && <MicOff size={8} className="text-red-400" />}
+            </div>
+
+            <div className="resize-handle absolute bottom-0 right-0 w-5 h-5 cursor-se-resize flex items-end justify-end p-0.5" onMouseDown={handleResizeStart}>
+                <GripVertical size={8} className="text-white/50 rotate-[-45deg]" />
+            </div>
+        </div>
+    );
+};
+
+const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'intermediate' }) => {
+    const [showLandscapePrompt, setShowLandscapePrompt] = useState(true);
+    const [isRecording, setIsRecording] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+    const [messages, setMessages] = useState([]);
+    const [timer, setTimer] = useState(0);
+    const [meetingTimer, setMeetingTimer] = useState(0);
+    const [questions, setQuestions] = useState([]);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [lastResult, setLastResult] = useState(null);
+    const [allResults, setAllResults] = useState([]);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState(false);
+    const [showTranscript, setShowTranscript] = useState(false);
+    
+    const timerRef = useRef(null);
+    const meetingTimerRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const videoPreviewRef = useRef(null);
+    const streamRef = useRef(null);
+    const chatContainerRef = useRef(null);
+
+    const savedUser = localStorage.getItem('user');
+    const userData = savedUser ? JSON.parse(savedUser) : {};
+    const profile = userProfile || { name: userData?.name || 'You', role: userData?.role || 'Professional' };
+
+    const generateLineFeedback = (transcript) => {
+        if (!transcript) return null;
+        const sentences = transcript.split(/(?<=[.!?])\s+/).filter(s => s.trim()).slice(0, 3);
+        const lineAnalysis = sentences.map((sentence) => {
+            const hasAction = /i (led|created|developed|implemented|managed)/i.test(sentence);
+            const hasFillers = /\b(um|uh|you know|basically)\b/i.test(sentence);
+            if (hasFillers) return { type: 'improve', feedback: 'Reduce filler words' };
+            if (hasAction) return { type: 'good', feedback: 'Great action verb' };
+            return { type: 'neutral', feedback: '' };
+        });
+        return { lineAnalysis: lineAnalysis.filter(i => i.type !== 'neutral').slice(0, 2) };
+    };
+
+    useEffect(() => {
+        const fetchQuestions = async () => {
+            setIsLoadingQuestions(true);
+            try {
+                const formData = new FormData();
+                formData.append('role', profile.role);
+                formData.append('difficulty', difficulty);
+                const response = await fetch(`${API_URL}/questions/generate`, { method: 'POST', body: formData });
+                const data = await response.json();
+                const qs = data.questions?.length > 0 ? data.questions : [
+                    { id: 1, question: "Tell me about yourself.", topic: "Introduction" },
+                    { id: 2, question: "What are your strengths?", topic: "Behavioral" }
+                ];
+                setQuestions(qs);
+                setMessages([{ role: 'ai', type: 'question', text: qs[0].question, topic: qs[0].topic }]);
+            } catch {
+                const qs = [{ id: 1, question: "Tell me about yourself.", topic: "Introduction" }];
+                setQuestions(qs);
+                setMessages([{ role: 'ai', text: qs[0].question, topic: qs[0].topic }]);
+            } finally {
+                setIsLoadingQuestions(false);
+            }
+        };
+        fetchQuestions();
+    }, []);
+
+    useEffect(() => {
+        if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }, [messages]);
+
+    useEffect(() => {
+        if (isRecording) timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
+        else { clearInterval(timerRef.current); setTimer(0); }
+        return () => clearInterval(timerRef.current);
+    }, [isRecording]);
+
+    useEffect(() => {
+        meetingTimerRef.current = setInterval(() => setMeetingTimer(t => t + 1), 1000);
+        return () => clearInterval(meetingTimerRef.current);
+    }, []);
+
+    useEffect(() => {
+        return () => { if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop()); };
+    }, []);
+
+    const currentQuestion = questions[currentQuestionIndex];
+    const isLastQuestion = currentQuestionIndex >= questions.length - 1;
+
+    const goToNextQuestion = () => {
+        if (!isLastQuestion) {
+            const nextQ = questions[currentQuestionIndex + 1];
+            setMessages(prev => [...prev, { role: 'ai', type: 'question', text: nextQ.question, topic: nextQ.topic }]);
+            setCurrentQuestionIndex(prev => prev + 1);
+            setHasAnsweredCurrent(false);
+        } else {
+            const avgScore = allResults.length > 0 
+                ? Math.round(allResults.reduce((sum, r) => sum + (r.overallScore || 0), 0) / allResults.length)
+                : 0;
+            setMessages(prev => [...prev, { role: 'ai', type: 'complete', text: `🎉 Interview Complete! Score: ${avgScore}/100` }]);
+        }
+    };
+
+    const handleSkipQuestion = () => {
+        setMessages(prev => [...prev, { role: 'user', type: 'skip', text: '(Skipped)' }]);
+        goToNextQuestion();
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            streamRef.current = stream;
+            if (videoPreviewRef.current) videoPreviewRef.current.srcObject = stream;
+
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+
+            recorder.onstop = async () => {
+                setIsProcessing(true);
+                const videoBlob = new Blob(audioChunksRef.current, { type: 'video/webm' });
+                audioChunksRef.current = [];
+
+                const formData = new FormData();
+                formData.append("file", videoBlob, "recording.webm");
+                formData.append("question", currentQuestion?.question || "Tell me about yourself");
+                formData.append("role", profile.role);
+
+                try {
+                    const response = await fetch(`${API_URL}/analyze`, { method: "POST", body: formData });
+                    if (!response.ok) throw new Error("Failed");
+                    const data = await response.json();
+                    const transcript = data.transcript || "(No speech)";
+                    const feedback = generateLineFeedback(transcript);
+                    
+                    setMessages(prev => [...prev, { role: 'user', type: 'answer', text: transcript, feedback, score: data.overallScore }]);
+                    
+                    const judgmentText = data.evaluation?.reasoning || data.content?.reasoning || 
+                        `Score: ${data.overallScore || 0}/100. ${data.overallScore >= 70 ? 'Great!' : data.overallScore >= 50 ? 'Good, room for improvement.' : 'Needs practice.'}`;
+                    setMessages(prev => [...prev, { role: 'ai', type: 'judgment', text: judgmentText, score: data.overallScore }]);
+
+                    setAllResults(prev => [...prev, { ...data, question: currentQuestion }]);
+                    setLastResult(data);
+                    setHasAnsweredCurrent(true);
+
+                } catch {
+                    setMessages(prev => [...prev, { role: 'ai', type: 'error', text: "Analysis failed. Try again." }]);
+                } finally {
+                    setIsProcessing(false);
+                    if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
+                    if (videoPreviewRef.current) videoPreviewRef.current.srcObject = null;
+                }
+            };
+
+            mediaRecorderRef.current = recorder;
+            recorder.start();
+            setIsRecording(true);
+        } catch {
+            alert("Camera/mic access denied.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+
+    if (isLoadingQuestions) {
+        return (
+            <div className="flex h-full items-center justify-center bg-[#0e1621]">
+                <div className="text-center">
+                    <Loader2 size={40} className="animate-spin text-[#0e72ed] mx-auto mb-3" />
+                    <p className="text-[#8b9cb6] text-sm">Setting up...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col h-full bg-[#0e1621] overflow-hidden">
+            {showLandscapePrompt && <LandscapePrompt onContinue={() => setShowLandscapePrompt(false)} />}
+
+            {/* Draggable User PiP */}
+            <DraggablePiP
+                videoRef={videoPreviewRef}
+                isRecording={isRecording}
+                isProcessing={isProcessing}
+                timer={timer}
+                formatTime={formatTime}
+                userName={profile.name}
+                isMuted={isMuted}
+            />
+
+            {/* Header - Compact */}
+            <header className="h-10 flex items-center justify-between px-3 bg-[#0e1621]/90 backdrop-blur-sm border-b border-white/5 z-30">
+                <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium truncate max-w-[120px] sm:max-w-none">{profile.role} Interview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[#8b9cb6] text-xs font-mono">{formatTime(meetingTimer)}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#0e72ed]/20 text-[#0e72ed] text-xs font-bold">
+                        {currentQuestionIndex + 1}/{questions.length}
+                    </span>
+                </div>
+            </header>
+
+            {/* Main Content - AI Interviewer Background + Overlay Chat */}
+            <div className="flex-1 relative overflow-hidden">
+                {/* AI Interviewer - Main Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#1a2332] to-[#0e1621] flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full bg-gradient-to-br from-[#0e72ed] to-[#0952b5] flex items-center justify-center mb-3 shadow-2xl ring-4 ring-white/10">
+                            <span className="text-3xl sm:text-4xl font-bold text-white">AI</span>
+                        </div>
+                        <p className="text-white font-medium text-sm sm:text-base">AI Interviewer</p>
+                        <p className="text-[#8b9cb6] text-xs mt-1">
+                            {isProcessing ? '🔄 Analyzing...' : isRecording ? '🎙️ Listening...' : '✓ Ready'}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Current Question - Bottom Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+                    <div className="flex items-start gap-2 mb-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0e72ed]/30 text-[#8ab4f8] whitespace-nowrap">
+                            {currentQuestion?.topic}
+                        </span>
+                    </div>
+                    <p className="text-white text-sm sm:text-base font-medium leading-snug">
+                        {currentQuestion?.question}
+                    </p>
+                </div>
+
+                {/* Transcript Toggle Button */}
+                <button 
+                    onClick={() => setShowTranscript(!showTranscript)}
+                    className="absolute top-3 right-3 px-2 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs flex items-center gap-1 z-20"
+                >
+                    {showTranscript ? 'Hide' : 'Show'} Log
+                    <ChevronRight size={12} className={`transition-transform ${showTranscript ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Transcript Panel - Slide from Right */}
+                {showTranscript && (
+                    <div className="absolute top-0 right-0 bottom-0 w-72 sm:w-80 bg-[#0e1621]/95 backdrop-blur-md border-l border-white/10 z-10 flex flex-col">
+                        <div className="p-2 border-b border-white/10">
+                            <span className="text-white text-xs font-medium">Conversation Log</span>
+                        </div>
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`${msg.role === 'user' ? 'ml-4' : 'mr-4'}`}>
+                                    <div className={`rounded-lg px-2.5 py-2 text-xs ${
+                                        msg.role === 'user' 
+                                            ? msg.type === 'skip' 
+                                                ? 'bg-gray-600/30 text-gray-400 italic'
+                                                : 'bg-green-600/20 border border-green-600/30 text-white'
+                                            : msg.type === 'judgment'
+                                                ? 'bg-purple-600/20 border border-purple-500/30 text-white'
+                                                : msg.type === 'complete'
+                                                    ? 'bg-green-600/20 border border-green-500/30 text-white'
+                                                    : 'bg-[#0e72ed]/20 border border-[#0e72ed]/30 text-white'
+                                    }`}>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                msg.role === 'user' ? 'bg-green-600' : msg.type === 'judgment' ? 'bg-purple-600' : 'bg-[#0e72ed]'
+                                            }`}>{msg.role === 'user' ? 'U' : 'AI'}</span>
+                                            <span className="text-[10px] text-white/60">
+                                                {msg.role === 'user' ? profile.name : msg.type === 'judgment' ? 'Feedback' : 'Interviewer'}
+                                            </span>
+                                            {msg.score !== undefined && (
+                                                <span className={`text-[10px] font-bold px-1 rounded ${
+                                                    msg.score >= 70 ? 'bg-green-500/30 text-green-400' : 'bg-yellow-500/30 text-yellow-400'
+                                                }`}>{msg.score}%</span>
+                                            )}
+                                        </div>
+                                        <p className="leading-relaxed">{msg.text}</p>
+                                        {msg.feedback?.lineAnalysis?.map((item, i) => (
+                                            <div key={i} className={`flex items-center gap-1 mt-1 text-[10px] ${
+                                                item.type === 'good' ? 'text-green-400' : 'text-orange-400'
+                                            }`}>
+                                                {item.type === 'good' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+                                                <span>{item.feedback}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            {isProcessing && (
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[#1a2332] rounded-lg">
+                                    <RefreshCw size={10} className="animate-spin text-[#0e72ed]" />
+                                    <span className="text-[10px] text-[#8b9cb6]">Analyzing...</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Recording Indicator Overlay */}
+                {isRecording && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 z-20">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-red-400 text-xs font-medium">Recording</span>
+                        <AudioVisualizer isActive={true} />
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Controls - Compact */}
+            <footer className="h-14 sm:h-16 bg-[#1a2332]/90 backdrop-blur-sm flex items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 border-t border-white/5">
+                <div className="flex-1 hidden sm:flex items-center">
+                    <span className="text-white text-xs">{formatTime(meetingTimer)}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                    <button onClick={() => setIsMuted(!isMuted)} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-red-600' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
+                        {isMuted ? <MicOff size={16} className="text-white" /> : <Mic size={16} className="text-white" />}
+                    </button>
+
+                    <button onClick={() => setIsVideoOff(!isVideoOff)} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-600' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
+                        {isVideoOff ? <VideoOff size={16} className="text-white" /> : <Video size={16} className="text-white" />}
+                    </button>
+
+                    <button
+                        onClick={() => isRecording ? stopRecording() : startRecording()}
+                        disabled={isProcessing}
+                        className={`px-4 sm:px-5 h-10 sm:h-12 rounded-full flex items-center gap-1.5 justify-center transition-all shadow-lg ${
+                            isRecording ? 'bg-red-600 ring-2 ring-red-500/30' : 'bg-[#0e72ed] hover:bg-[#0952b5]'
+                        } ${isProcessing ? 'opacity-50' : ''}`}
+                    >
+                        {isRecording ? (
+                            <><Square size={14} fill="white" className="text-white" /><span className="text-white text-sm font-medium">Stop</span></>
+                        ) : (
+                            <><Mic size={14} className="text-white" /><span className="text-white text-sm font-medium">Start</span></>
+                        )}
+                    </button>
+
+                    <button 
+                        onClick={handleSkipQuestion}
+                        disabled={isRecording || isProcessing || isLastQuestion}
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center justify-center ${
+                            (isRecording || isProcessing || isLastQuestion) ? 'opacity-40' : ''
+                        }`}
+                    >
+                        <SkipForward size={16} className="text-white" />
+                    </button>
+
+                    {hasAnsweredCurrent && !isLastQuestion && (
+                        <button 
+                            onClick={goToNextQuestion}
+                            className="px-3 h-9 sm:h-10 rounded-full bg-green-600 hover:bg-green-700 flex items-center gap-1 text-white text-sm font-medium"
+                        >
+                            Next <ChevronRight size={14} />
+                        </button>
+                    )}
+
+                    <button 
+                        onClick={() => onEndQuestion(lastResult ? { ...lastResult, allResults, duration: meetingTimer } : null)} 
+                        disabled={isRecording || isProcessing}
+                        className={`px-3 sm:px-4 h-9 sm:h-10 rounded-full bg-red-600 hover:bg-red-700 flex items-center gap-1 ${
+                            (isRecording || isProcessing) ? 'opacity-50' : ''
+                        }`}
+                    >
+                        <Phone size={14} className="text-white rotate-[135deg]" />
+                        <span className="text-white text-sm font-medium hidden sm:inline">End</span>
+                    </button>
+                </div>
+
+                <div className="flex-1 hidden sm:flex justify-end">
+                    <button className="w-10 h-10 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center justify-center">
+                        <MoreVertical size={16} className="text-white" />
+                    </button>
+                </div>
+            </footer>
+        </div>
+    );
+};
+
+export default ActiveInterviewView;
