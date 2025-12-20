@@ -1,26 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, Square, Video, VideoOff, RefreshCw, Loader2, CheckCircle, AlertCircle, Phone, MoreVertical, Move, GripVertical, SkipForward, Users, Hand } from 'lucide-react';
+import { Mic, MicOff, Square, Video, VideoOff, RefreshCw, Loader2, CheckCircle, AlertCircle, Phone, MoreVertical, Move, GripVertical, SkipForward, ChevronRight } from 'lucide-react';
 import AudioVisualizer from '../components/visuals/AudioVisualizer';
 import { API_URL } from '../config';
 
 const MAX_RECORDING_SECONDS = 60;
-
-// Theme - Using Zoom-style dark theme
-const theme = {
-    bg: 'bg-[#0e1621]',
-    headerBg: 'bg-[#0e1621]',
-    controlsBg: 'bg-[#1a2332]',
-    buttonBg: 'bg-[#2d3748]',
-    buttonHover: 'hover:bg-[#3d4a5c]',
-    accent: '#0e72ed',
-    accentBg: 'bg-[#0e72ed]',
-    endCall: 'bg-[#e02828] hover:bg-[#c02020]',
-    videoBg: 'bg-[#1a2332]',
-    chatBg: 'bg-[#151d2b]',
-    text: 'text-white',
-    textMuted: 'text-[#8b9cb6]',
-    border: 'border-[#2d3748]'
-};
 
 // Landscape Orientation Prompt
 const LandscapePrompt = ({ onContinue }) => {
@@ -38,23 +21,38 @@ const LandscapePrompt = ({ onContinue }) => {
     return (
         <div className="fixed inset-0 z-[100] bg-[#0e1621] flex items-center justify-center p-6">
             <div className="text-center max-w-sm">
-                <h2 className="text-2xl font-bold text-white mb-3">Rotate Your Device</h2>
-                <p className="text-gray-400 mb-6">For the best experience, use landscape mode.</p>
-                <button onClick={onContinue} className="w-full py-3 bg-[#2d3748] text-white rounded-xl font-medium">Continue Anyway</button>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                    <span className="text-2xl">📱</span>
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">Rotate Your Device</h2>
+                <p className="text-gray-400 mb-4 text-sm">For the best interview experience, please rotate to landscape mode.</p>
+                <button onClick={onContinue} className="w-full py-3 bg-[#0e72ed] text-white rounded-xl font-medium">Continue Anyway</button>
             </div>
         </div>
     );
 };
 
-// Draggable & Resizable PiP Component
+// Draggable PiP Component - Optimized for all screen sizes
 const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, userName, isMuted }) => {
-    const [position, setPosition] = useState({ x: window.innerWidth - 220, y: 80 });
-    const [size, setSize] = useState({ width: 200, height: 150 });
+    const [position, setPosition] = useState({ x: 16, y: 60 });
+    const [size, setSize] = useState({ width: 160, height: 120 });
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [initialPos, setInitialPos] = useState({ x: 0, y: 0 });
     const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+
+    // Adjust size based on screen
+    useEffect(() => {
+        const updateSize = () => {
+            const isMobile = window.innerWidth < 768;
+            setSize(isMobile ? { width: 120, height: 90 } : { width: 180, height: 135 });
+            setPosition({ x: 16, y: 60 });
+        };
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        return () => window.removeEventListener('resize', updateSize);
+    }, []);
 
     const handleMouseDown = useCallback((e) => {
         if (e.target.closest('.resize-handle')) return;
@@ -66,17 +64,15 @@ const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, 
 
     const handleMouseMove = useCallback((e) => {
         if (isDragging) {
-            const deltaX = e.clientX - dragStart.x;
-            const deltaY = e.clientY - dragStart.y;
             setPosition({
-                x: Math.max(0, Math.min(window.innerWidth - size.width, initialPos.x + deltaX)),
-                y: Math.max(0, Math.min(window.innerHeight - size.height - 100, initialPos.y + deltaY))
+                x: Math.max(8, Math.min(window.innerWidth - size.width - 8, initialPos.x + (e.clientX - dragStart.x))),
+                y: Math.max(50, Math.min(window.innerHeight - size.height - 80, initialPos.y + (e.clientY - dragStart.y)))
             });
         }
         if (isResizing) {
             setSize({
-                width: Math.max(140, Math.min(400, initialSize.width + (e.clientX - dragStart.x))),
-                height: Math.max(100, Math.min(300, initialSize.height + (e.clientY - dragStart.y)))
+                width: Math.max(100, Math.min(280, initialSize.width + (e.clientX - dragStart.x))),
+                height: Math.max(75, Math.min(210, initialSize.height + (e.clientY - dragStart.y)))
             });
         }
     }, [isDragging, isResizing, dragStart, initialPos, initialSize, size]);
@@ -110,15 +106,15 @@ const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, 
         if (isDragging) {
             const touch = e.touches[0];
             setPosition({
-                x: Math.max(0, Math.min(window.innerWidth - size.width, initialPos.x + (touch.clientX - dragStart.x))),
-                y: Math.max(0, Math.min(window.innerHeight - size.height - 100, initialPos.y + (touch.clientY - dragStart.y)))
+                x: Math.max(8, Math.min(window.innerWidth - size.width - 8, initialPos.x + (touch.clientX - dragStart.x))),
+                y: Math.max(50, Math.min(window.innerHeight - size.height - 80, initialPos.y + (touch.clientY - dragStart.y)))
             });
         }
     };
 
     return (
         <div
-            className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border-2 border-[#2d3748] cursor-move select-none"
+            className="fixed z-50 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 cursor-move select-none"
             style={{ left: position.x, top: position.y, width: size.width, height: size.height }}
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
@@ -129,14 +125,14 @@ const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, 
             
             {!isRecording && !isProcessing && (
                 <div className="absolute inset-0 bg-[#1a2332] flex items-center justify-center">
-                    <div className="w-14 h-14 rounded-full bg-[#3d4a5c] flex items-center justify-center">
-                        <span className="text-2xl font-medium text-white">{userName?.charAt(0) || 'U'}</span>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                        <span className="text-lg font-bold text-white">{userName?.charAt(0) || 'U'}</span>
                     </div>
                 </div>
             )}
 
             {isRecording && (
-                <div className={`absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${timer > MAX_RECORDING_SECONDS - 15 ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                <div className={`absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${timer > MAX_RECORDING_SECONDS - 15 ? 'bg-yellow-500' : 'bg-red-500'}`}>
                     <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                     <span className="text-white">{formatTime(timer)}</span>
                 </div>
@@ -144,21 +140,21 @@ const DraggablePiP = ({ videoRef, isRecording, isProcessing, timer, formatTime, 
 
             {isProcessing && (
                 <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                    <RefreshCw size={24} className="animate-spin text-white" />
+                    <RefreshCw size={18} className="animate-spin text-white" />
                 </div>
             )}
 
-            <div className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 opacity-70 hover:opacity-100">
-                <Move size={12} className="text-white" />
+            <div className="absolute top-1 right-1 p-1 rounded bg-black/40 opacity-60 hover:opacity-100">
+                <Move size={10} className="text-white" />
             </div>
 
-            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/60">
-                <span className="text-white text-xs font-medium">{userName}</span>
-                {isMuted && <MicOff size={10} className="text-white" />}
+            <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 flex items-center gap-1">
+                <span className="text-white text-[10px] font-medium">{userName}</span>
+                {isMuted && <MicOff size={8} className="text-red-400" />}
             </div>
 
-            <div className="resize-handle absolute bottom-0 right-0 w-8 h-8 cursor-se-resize flex items-end justify-end p-1.5" onMouseDown={handleResizeStart}>
-                <GripVertical size={12} className="text-white/60 rotate-[-45deg]" />
+            <div className="resize-handle absolute bottom-0 right-0 w-5 h-5 cursor-se-resize flex items-end justify-end p-0.5" onMouseDown={handleResizeStart}>
+                <GripVertical size={8} className="text-white/50 rotate-[-45deg]" />
             </div>
         </div>
     );
@@ -179,6 +175,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState(false);
+    const [showTranscript, setShowTranscript] = useState(false);
     
     const timerRef = useRef(null);
     const meetingTimerRef = useRef(null);
@@ -223,7 +220,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
             } catch {
                 const qs = [{ id: 1, question: "Tell me about yourself.", topic: "Introduction" }];
                 setQuestions(qs);
-                setMessages([{ role: 'ai', type: 'question', text: qs[0].question, topic: qs[0].topic }]);
+                setMessages([{ role: 'ai', text: qs[0].question, topic: qs[0].topic }]);
             } finally {
                 setIsLoadingQuestions(false);
             }
@@ -263,12 +260,12 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
             const avgScore = allResults.length > 0 
                 ? Math.round(allResults.reduce((sum, r) => sum + (r.overallScore || 0), 0) / allResults.length)
                 : 0;
-            setMessages(prev => [...prev, { role: 'ai', type: 'complete', text: `🎉 Interview Complete! Your average score: ${avgScore}/100` }]);
+            setMessages(prev => [...prev, { role: 'ai', type: 'complete', text: `🎉 Interview Complete! Score: ${avgScore}/100` }]);
         }
     };
 
     const handleSkipQuestion = () => {
-        setMessages(prev => [...prev, { role: 'user', type: 'skip', text: '(Skipped this question)' }]);
+        setMessages(prev => [...prev, { role: 'user', type: 'skip', text: '(Skipped)' }]);
         goToNextQuestion();
     };
 
@@ -295,15 +292,13 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     const response = await fetch(`${API_URL}/analyze`, { method: "POST", body: formData });
                     if (!response.ok) throw new Error("Failed");
                     const data = await response.json();
-                    const transcript = data.transcript || "(No speech detected)";
+                    const transcript = data.transcript || "(No speech)";
                     const feedback = generateLineFeedback(transcript);
                     
-                    // Add user's response
                     setMessages(prev => [...prev, { role: 'user', type: 'answer', text: transcript, feedback, score: data.overallScore }]);
                     
-                    // Add AI judgment/feedback
                     const judgmentText = data.evaluation?.reasoning || data.content?.reasoning || 
-                        `Score: ${data.overallScore || 0}/100. ${data.overallScore >= 70 ? 'Good response!' : data.overallScore >= 50 ? 'Decent attempt, but could be improved.' : 'Needs more practice.'}`;
+                        `Score: ${data.overallScore || 0}/100. ${data.overallScore >= 70 ? 'Great!' : data.overallScore >= 50 ? 'Good, room for improvement.' : 'Needs practice.'}`;
                     setMessages(prev => [...prev, { role: 'ai', type: 'judgment', text: judgmentText, score: data.overallScore }]);
 
                     setAllResults(prev => [...prev, { ...data, question: currentQuestion }]);
@@ -311,7 +306,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     setHasAnsweredCurrent(true);
 
                 } catch {
-                    setMessages(prev => [...prev, { role: 'ai', type: 'error', text: "⚠️ Analysis failed. Please try again." }]);
+                    setMessages(prev => [...prev, { role: 'ai', type: 'error', text: "Analysis failed. Try again." }]);
                 } finally {
                     setIsProcessing(false);
                     if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
@@ -340,8 +335,8 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
         return (
             <div className="flex h-full items-center justify-center bg-[#0e1621]">
                 <div className="text-center">
-                    <Loader2 size={48} className="animate-spin text-[#0e72ed] mx-auto mb-4" />
-                    <p className="text-[#8b9cb6]">Setting up interview...</p>
+                    <Loader2 size={40} className="animate-spin text-[#0e72ed] mx-auto mb-3" />
+                    <p className="text-[#8b9cb6] text-sm">Setting up...</p>
                 </div>
             </div>
         );
@@ -351,6 +346,7 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
         <div className="flex flex-col h-full bg-[#0e1621] overflow-hidden">
             {showLandscapePrompt && <LandscapePrompt onContinue={() => setShowLandscapePrompt(false)} />}
 
+            {/* Draggable User PiP */}
             <DraggablePiP
                 videoRef={videoPreviewRef}
                 isRecording={isRecording}
@@ -361,183 +357,183 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                 isMuted={isMuted}
             />
 
-            {/* Header */}
-            <header className="h-12 flex items-center justify-between px-4 bg-[#0e1621] border-b border-[#2d3748]">
-                <span className="text-white font-medium">{profile.role} Interview</span>
-                <div className="flex items-center gap-3">
-                    <span className="text-[#8b9cb6] text-sm font-mono">{formatTime(meetingTimer)}</span>
-                    <span className="px-3 py-1 rounded-full bg-[#2d3748] text-white text-sm">
-                        Q{currentQuestionIndex + 1}/{questions.length}
+            {/* Header - Compact */}
+            <header className="h-10 flex items-center justify-between px-3 bg-[#0e1621]/90 backdrop-blur-sm border-b border-white/5 z-30">
+                <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium truncate max-w-[120px] sm:max-w-none">{profile.role} Interview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[#8b9cb6] text-xs font-mono">{formatTime(meetingTimer)}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#0e72ed]/20 text-[#0e72ed] text-xs font-bold">
+                        {currentQuestionIndex + 1}/{questions.length}
                     </span>
                 </div>
             </header>
 
-            {/* Main Content - Chat Log Layout */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Chat/Conversation Log - Full Width */}
-                <div className="flex-1 flex flex-col">
-                    {/* Messages */}
-                    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {messages.map((msg, idx) => (
-                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-2' : ''}`}>
-                                    {/* Message Header */}
-                                    <div className={`flex items-center gap-2 mb-1 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                                            msg.role === 'user' ? 'bg-green-600 order-2' : 
-                                            msg.type === 'judgment' ? 'bg-purple-600' : 'bg-[#0e72ed]'
-                                        }`}>
-                                            {msg.role === 'user' ? profile.name?.charAt(0) : 'AI'}
-                                        </div>
-                                        <span className="text-xs text-[#8b9cb6]">
-                                            {msg.role === 'user' ? profile.name : 
-                                             msg.type === 'judgment' ? 'AI Feedback' : 'AI Interviewer'}
-                                        </span>
-                                        {msg.score !== undefined && (
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                                msg.score >= 70 ? 'bg-green-500/20 text-green-400' : 
-                                                msg.score >= 50 ? 'bg-yellow-500/20 text-yellow-400' : 
-                                                'bg-red-500/20 text-red-400'
-                                            }`}>{msg.score}%</span>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Message Bubble */}
-                                    <div className={`rounded-2xl px-4 py-3 ${
+            {/* Main Content - AI Interviewer Background + Overlay Chat */}
+            <div className="flex-1 relative overflow-hidden">
+                {/* AI Interviewer - Main Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#1a2332] to-[#0e1621] flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full bg-gradient-to-br from-[#0e72ed] to-[#0952b5] flex items-center justify-center mb-3 shadow-2xl ring-4 ring-white/10">
+                            <span className="text-3xl sm:text-4xl font-bold text-white">AI</span>
+                        </div>
+                        <p className="text-white font-medium text-sm sm:text-base">AI Interviewer</p>
+                        <p className="text-[#8b9cb6] text-xs mt-1">
+                            {isProcessing ? '🔄 Analyzing...' : isRecording ? '🎙️ Listening...' : '✓ Ready'}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Current Question - Bottom Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+                    <div className="flex items-start gap-2 mb-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0e72ed]/30 text-[#8ab4f8] whitespace-nowrap">
+                            {currentQuestion?.topic}
+                        </span>
+                    </div>
+                    <p className="text-white text-sm sm:text-base font-medium leading-snug">
+                        {currentQuestion?.question}
+                    </p>
+                </div>
+
+                {/* Transcript Toggle Button */}
+                <button 
+                    onClick={() => setShowTranscript(!showTranscript)}
+                    className="absolute top-3 right-3 px-2 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs flex items-center gap-1 z-20"
+                >
+                    {showTranscript ? 'Hide' : 'Show'} Log
+                    <ChevronRight size={12} className={`transition-transform ${showTranscript ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Transcript Panel - Slide from Right */}
+                {showTranscript && (
+                    <div className="absolute top-0 right-0 bottom-0 w-72 sm:w-80 bg-[#0e1621]/95 backdrop-blur-md border-l border-white/10 z-10 flex flex-col">
+                        <div className="p-2 border-b border-white/10">
+                            <span className="text-white text-xs font-medium">Conversation Log</span>
+                        </div>
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`${msg.role === 'user' ? 'ml-4' : 'mr-4'}`}>
+                                    <div className={`rounded-lg px-2.5 py-2 text-xs ${
                                         msg.role === 'user' 
                                             ? msg.type === 'skip' 
-                                                ? 'bg-gray-600/30 border border-gray-500/30 text-gray-400 italic'
+                                                ? 'bg-gray-600/30 text-gray-400 italic'
                                                 : 'bg-green-600/20 border border-green-600/30 text-white'
-                                            : msg.type === 'question'
-                                                ? 'bg-[#0e72ed]/20 border border-[#0e72ed]/30 text-white'
-                                                : msg.type === 'judgment'
-                                                    ? 'bg-purple-600/20 border border-purple-500/30 text-white'
-                                                    : msg.type === 'complete'
-                                                        ? 'bg-green-600/20 border border-green-500/30 text-white'
-                                                        : 'bg-[#1a2332] border border-[#2d3748] text-white'
+                                            : msg.type === 'judgment'
+                                                ? 'bg-purple-600/20 border border-purple-500/30 text-white'
+                                                : msg.type === 'complete'
+                                                    ? 'bg-green-600/20 border border-green-500/30 text-white'
+                                                    : 'bg-[#0e72ed]/20 border border-[#0e72ed]/30 text-white'
                                     }`}>
-                                        {msg.type === 'question' && msg.topic && (
-                                            <span className="inline-block px-2 py-0.5 mb-2 rounded text-xs bg-[#0e72ed]/30 text-[#8ab4f8]">
-                                                📍 {msg.topic}
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                msg.role === 'user' ? 'bg-green-600' : msg.type === 'judgment' ? 'bg-purple-600' : 'bg-[#0e72ed]'
+                                            }`}>{msg.role === 'user' ? 'U' : 'AI'}</span>
+                                            <span className="text-[10px] text-white/60">
+                                                {msg.role === 'user' ? profile.name : msg.type === 'judgment' ? 'Feedback' : 'Interviewer'}
                                             </span>
-                                        )}
-                                        <p className="text-sm leading-relaxed">{msg.text}</p>
-                                        
-                                        {/* Inline Feedback */}
+                                            {msg.score !== undefined && (
+                                                <span className={`text-[10px] font-bold px-1 rounded ${
+                                                    msg.score >= 70 ? 'bg-green-500/30 text-green-400' : 'bg-yellow-500/30 text-yellow-400'
+                                                }`}>{msg.score}%</span>
+                                            )}
+                                        </div>
+                                        <p className="leading-relaxed">{msg.text}</p>
                                         {msg.feedback?.lineAnalysis?.map((item, i) => (
-                                            <div key={i} className={`flex items-center gap-1.5 mt-2 text-xs ${
+                                            <div key={i} className={`flex items-center gap-1 mt-1 text-[10px] ${
                                                 item.type === 'good' ? 'text-green-400' : 'text-orange-400'
                                             }`}>
-                                                {item.type === 'good' ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                                                {item.type === 'good' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
                                                 <span>{item.feedback}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                        
-                        {/* Recording Indicator */}
-                        {isRecording && (
-                            <div className="flex justify-end">
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-red-500/20 border border-red-500/30">
-                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-red-400">Recording... Speak now</span>
-                                    <AudioVisualizer isActive={true} />
+                            ))}
+                            {isProcessing && (
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[#1a2332] rounded-lg">
+                                    <RefreshCw size={10} className="animate-spin text-[#0e72ed]" />
+                                    <span className="text-[10px] text-[#8b9cb6]">Analyzing...</span>
                                 </div>
-                            </div>
-                        )}
-
-                        {/* Processing Indicator */}
-                        {isProcessing && (
-                            <div className="flex justify-start">
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#1a2332] border border-[#2d3748]">
-                                    <RefreshCw size={14} className="animate-spin text-[#0e72ed]" />
-                                    <span className="text-sm text-[#8b9cb6]">AI is analyzing your response...</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Current Question Bar */}
-                    <div className="px-4 py-3 bg-[#1a2332] border-t border-[#2d3748]">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex-1">
-                                <span className="text-xs text-[#8b9cb6]">Current Question:</span>
-                                <p className="text-white text-sm font-medium truncate">{currentQuestion?.question}</p>
-                            </div>
-                            {hasAnsweredCurrent && !isLastQuestion && (
-                                <button 
-                                    onClick={goToNextQuestion}
-                                    className="px-4 py-2 bg-[#0e72ed] hover:bg-[#0952b5] text-white rounded-lg text-sm font-medium flex items-center gap-2"
-                                >
-                                    Next <SkipForward size={14} />
-                                </button>
                             )}
                         </div>
                     </div>
-                </div>
+                )}
+
+                {/* Recording Indicator Overlay */}
+                {isRecording && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 z-20">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-red-400 text-xs font-medium">Recording</span>
+                        <AudioVisualizer isActive={true} />
+                    </div>
+                )}
             </div>
 
-            {/* Bottom Controls */}
-            <footer className="h-20 bg-[#1a2332] flex items-center justify-center gap-3 px-4 mb-16 md:mb-0">
-                <div className="flex-1 flex items-center gap-2">
-                    <span className="hidden md:block text-white text-sm">{formatTime(meetingTimer)}</span>
+            {/* Bottom Controls - Compact */}
+            <footer className="h-14 sm:h-16 bg-[#1a2332]/90 backdrop-blur-sm flex items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 border-t border-white/5">
+                <div className="flex-1 hidden sm:flex items-center">
+                    <span className="text-white text-xs">{formatTime(meetingTimer)}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setIsMuted(!isMuted)} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-[#e02828]' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
-                        {isMuted ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                    <button onClick={() => setIsMuted(!isMuted)} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-red-600' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
+                        {isMuted ? <MicOff size={16} className="text-white" /> : <Mic size={16} className="text-white" />}
                     </button>
 
-                    <button onClick={() => setIsVideoOff(!isVideoOff)} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isVideoOff ? 'bg-[#e02828]' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
-                        {isVideoOff ? <VideoOff size={20} className="text-white" /> : <Video size={20} className="text-white" />}
+                    <button onClick={() => setIsVideoOff(!isVideoOff)} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-600' : 'bg-[#2d3748] hover:bg-[#3d4a5c]'}`}>
+                        {isVideoOff ? <VideoOff size={16} className="text-white" /> : <Video size={16} className="text-white" />}
                     </button>
 
                     <button
                         onClick={() => isRecording ? stopRecording() : startRecording()}
                         disabled={isProcessing}
-                        className={`px-6 h-14 rounded-full flex items-center gap-2 justify-center transition-all shadow-lg ${
-                            isRecording ? 'bg-[#e02828] ring-4 ring-red-500/30' : 'bg-[#0e72ed]'
+                        className={`px-4 sm:px-5 h-10 sm:h-12 rounded-full flex items-center gap-1.5 justify-center transition-all shadow-lg ${
+                            isRecording ? 'bg-red-600 ring-2 ring-red-500/30' : 'bg-[#0e72ed] hover:bg-[#0952b5]'
                         } ${isProcessing ? 'opacity-50' : ''}`}
                     >
                         {isRecording ? (
-                            <><Square size={20} fill="white" className="text-white" /><span className="text-white font-medium">Stop</span></>
+                            <><Square size={14} fill="white" className="text-white" /><span className="text-white text-sm font-medium">Stop</span></>
                         ) : (
-                            <><Mic size={20} className="text-white" /><span className="text-white font-medium">Start</span></>
+                            <><Mic size={14} className="text-white" /><span className="text-white text-sm font-medium">Start</span></>
                         )}
                     </button>
 
-                    {/* Skip Question Button */}
                     <button 
                         onClick={handleSkipQuestion}
                         disabled={isRecording || isProcessing || isLastQuestion}
-                        className={`px-4 h-12 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center gap-2 transition-all ${
-                            (isRecording || isProcessing || isLastQuestion) ? 'opacity-50' : ''
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center justify-center ${
+                            (isRecording || isProcessing || isLastQuestion) ? 'opacity-40' : ''
                         }`}
                     >
-                        <SkipForward size={18} className="text-white" />
-                        <span className="text-white font-medium hidden md:inline">Skip</span>
+                        <SkipForward size={16} className="text-white" />
                     </button>
+
+                    {hasAnsweredCurrent && !isLastQuestion && (
+                        <button 
+                            onClick={goToNextQuestion}
+                            className="px-3 h-9 sm:h-10 rounded-full bg-green-600 hover:bg-green-700 flex items-center gap-1 text-white text-sm font-medium"
+                        >
+                            Next <ChevronRight size={14} />
+                        </button>
+                    )}
 
                     <button 
                         onClick={() => onEndQuestion(lastResult ? { ...lastResult, allResults, duration: meetingTimer } : null)} 
                         disabled={isRecording || isProcessing}
-                        className={`px-5 h-12 rounded-full bg-[#e02828] hover:bg-[#c02020] flex items-center justify-center transition-all ${
+                        className={`px-3 sm:px-4 h-9 sm:h-10 rounded-full bg-red-600 hover:bg-red-700 flex items-center gap-1 ${
                             (isRecording || isProcessing) ? 'opacity-50' : ''
                         }`}
                     >
-                        <Phone size={20} className="text-white rotate-[135deg]" />
-                        <span className="hidden md:inline text-white font-medium ml-2">End Meeting</span>
+                        <Phone size={14} className="text-white rotate-[135deg]" />
+                        <span className="text-white text-sm font-medium hidden sm:inline">End</span>
                     </button>
                 </div>
 
-                <div className="flex-1 flex items-center justify-end gap-2">
-                    <button className="hidden md:flex w-12 h-12 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] items-center justify-center">
-                        <Users size={20} className="text-white" />
-                    </button>
-                    <button className="w-12 h-12 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center justify-center">
-                        <MoreVertical size={20} className="text-white" />
+                <div className="flex-1 hidden sm:flex justify-end">
+                    <button className="w-10 h-10 rounded-full bg-[#2d3748] hover:bg-[#3d4a5c] flex items-center justify-center">
+                        <MoreVertical size={16} className="text-white" />
                     </button>
                 </div>
             </footer>
