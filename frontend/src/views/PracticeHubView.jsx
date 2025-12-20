@@ -26,7 +26,7 @@ const PracticeHubView = () => {
         // Technical Skills
         { id: 4, title: "Data Structures Crash Course", category: "Technical", type: "Course", duration: "3 hours", link: "https://www.coursera.org/courses?query=data%20structures", rating: 4.9 },
         { id: 5, title: "System Design Interview Prep", category: "Technical", type: "Guide", duration: "2 hours", link: "https://github.com/donnemartin/system-design-primer", rating: 4.9 },
-        { id: 6, title: "LeetCode Top Interview Questions", category: "Technical", type: "Practice", duration: "10+ hours", link: "https://leetcode.com/problemset/top-interview-questions/", rating: 4.8 },
+        { id: 6, title: "LeetCode Top Interview Questions", category: "Technical", type: "Practice", duration: "10+ hours", link: "https://leetcode.com/explore/interview/", rating: 4.8 },
         
         // Behavioral Skills
         { id: 7, title: "Top 50 Behavioral Questions", category: "Behavioral", type: "Guide", duration: "1 hour", link: "https://www.themuse.com/advice/30-behavioral-interview-questions-you-should-be-ready-to-answer", rating: 4.7 },
@@ -36,7 +36,7 @@ const PracticeHubView = () => {
         // General Interview Prep
         { id: 10, title: "Interview Confidence Building", category: "General", type: "Video", duration: "15 min", link: "https://www.youtube.com/results?search_query=interview+confidence+tips", rating: 4.4 },
         { id: 11, title: "Resume Optimization Tips", category: "General", type: "Article", duration: "10 min", link: "https://www.resumegenius.com/blog/resume-help/how-to-make-a-resume", rating: 4.6 },
-        { id: 12, title: "Salary Negotiation Strategies", category: "General", type: "Guide", duration: "30 min", link: "https://www.glassdoor.com/blog/guide/how-to-negotiate-salary/", rating: 4.8 }
+        { id: 12, title: "Salary Negotiation Strategies", category: "General", type: "Guide", duration: "30 min", link: "https://www.glassdoor.com/blog/guide/how-to-negotiate-your-salary/", rating: 4.8 }
     ];
 
     const categories = ['all', 'Communication', 'Technical', 'Behavioral', 'General'];
