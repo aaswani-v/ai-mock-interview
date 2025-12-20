@@ -120,7 +120,7 @@ const ProfileView = ({ profile, onNavigate }) => {
                         <p className="text-slate-400 flex items-center gap-2"><MapPin size={16} /> {displayProfile.role || 'Professional'}</p>
                     </div>
                 </div>
-                <div className="absolute -bottom-16 right-8 flex gap-3">
+                <div className="absolute -bottom-16 right-4 sm:right-8 flex gap-2 sm:gap-3">
                     {isEditing ? (
                         <>
                             <Button variant="danger" icon={X} onClick={handleEditToggle} disabled={isSaving}>Cancel</Button>
