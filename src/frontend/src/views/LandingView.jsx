@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Brain, FileText, Target, Activity, Star, Zap, ArrowRight, ChevronRight,
     BookOpen, Layers
@@ -9,8 +9,59 @@ import AdvancedResumeScanner from '../components/visuals/AdvancedResumeScanner';
 import AnimatedGraph from '../components/visuals/AnimatedGraph';
 import AdvancedBadge from '../components/visuals/AdvancedBadge';
 import AutoChecklist from '../components/visuals/AutoChecklist';
+import StreakFlame from '../components/visuals/StreakFlame';
 import TiltCard from '../components/ui/TiltCard';
 import Button from '../components/ui/Button';
+
+// Typewriter component for the tagline
+const Typewriter = ({ text, speed = 80, pauseTime = 2000 }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [isTyping, setIsTyping] = useState(true);
+    const [showCursor, setShowCursor] = useState(true);
+
+    useEffect(() => {
+        let timeout;
+
+        if (isTyping) {
+            if (displayText.length < text.length) {
+                timeout = setTimeout(() => {
+                    setDisplayText(text.slice(0, displayText.length + 1));
+                }, speed);
+            } else {
+                // Finished typing, pause then reset
+                timeout = setTimeout(() => {
+                    setIsTyping(false);
+                    setDisplayText('');
+                }, pauseTime);
+            }
+        } else {
+            // Start typing again
+            timeout = setTimeout(() => {
+                setIsTyping(true);
+            }, 500);
+        }
+
+        return () => clearTimeout(timeout);
+    }, [displayText, isTyping, text, speed, pauseTime]);
+
+    // Cursor blink effect
+    useEffect(() => {
+        const cursorInterval = setInterval(() => {
+            setShowCursor(prev => !prev);
+        }, 530);
+        return () => clearInterval(cursorInterval);
+    }, []);
+
+    return (
+        <span className="inline-flex items-center">
+            <span>{displayText}</span>
+            <span
+                className={`inline-block w-0.5 h-6 sm:h-8 md:h-10 bg-cyan-500 ml-1 transition-opacity duration-100 ${showCursor ? 'opacity-100' : 'opacity-0'
+                    }`}
+            ></span>
+        </span>
+    );
+};
 
 const LandingView = ({ onStart }) => {
     return (
@@ -37,8 +88,12 @@ const LandingView = ({ onStart }) => {
                         </h1>
 
                         <div className="h-auto sm:h-8 md:h-12 mb-8 sm:mb-12 flex justify-center">
-                            <p className="text-base sm:text-xl md:text-2xl text-slate-400 font-mono sm:border-r-4 sm:border-cyan-500 pr-2 sm:animate-typewriter sm:overflow-hidden sm:whitespace-nowrap w-full sm:w-fit text-center sm:text-left break-words">
-                                Real-time mock interviews + personalized feedback
+                            <p className="text-base sm:text-xl md:text-2xl text-slate-400 font-mono w-full sm:w-fit text-center sm:text-left">
+                                <Typewriter
+                                    text="Real-time mock interviews + personalized feedback"
+                                    speed={60}
+                                    pauseTime={3000}
+                                />
                             </p>
                         </div>
 
@@ -95,12 +150,21 @@ const LandingView = ({ onStart }) => {
                         </div>
                     </div>
 
+                    {/* Streak Flame Section - NEW */}
                     <div className="flex flex-col md:flex-row items-center justify-center gap-16">
                         <div className="order-2 md:order-1 max-w-md text-center md:text-right">
+                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Build Your Streak</h2>
+                            <p className="text-slate-400 text-lg">Stay consistent with daily practice sessions. Build your streak to unlock exclusive rewards and keep your motivation burning.</p>
+                        </div>
+                        <div className="order-1 md:order-2"><StreakFlame streak={7} /></div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-16">
+                        <div><AutoChecklist /></div>
+                        <div className="max-w-md text-center md:text-left">
                             <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Automated Roadmap</h2>
                             <p className="text-slate-400 text-lg">Never wonder what to study next. Our AI generates a daily checklist of tasks to keep your preparation on track.</p>
                         </div>
-                        <div className="order-1 md:order-2"><AutoChecklist /></div>
                     </div>
                 </div>
 
