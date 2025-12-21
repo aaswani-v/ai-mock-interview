@@ -26,3 +26,18 @@ services:
       - key: ALLOWED_ORIGINS
         value: "*"
     rootDir: backend
+
+  # ============================================
+  # FRONTEND - React/Vite Static Site
+  # ============================================
+  - type: web
+    name: ai-mock-interviewinteraura-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    rootDir: backend/frontend
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
