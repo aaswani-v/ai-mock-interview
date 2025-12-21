@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Zap, Star, ChevronRight, Mail, Lock, RefreshCw } from 'lucide-react';
+import { Zap, Star, ChevronRight, Mail, Lock, RefreshCw, Sparkles } from 'lucide-react';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_URL } from '../config';
 
-const LoginView = ({ onLogin, onRegisterClick }) => {
+const LoginView = ({ onLogin, onRegisterClick, onForgotPasswordClick, onMagicLinkClick }) => {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ const LoginView = ({ onLogin, onRegisterClick }) => {
                     experience_years: profile.experience_years || '',
                     salary_expectation: profile.salary_expectation || '',
                     profile_completed: profile.profile_completed || !!profile.name,
-                    emailVerified: true // Supabase handles verification
+                    emailVerified: true
                 };
                 
                 localStorage.setItem('user', JSON.stringify(userData));
@@ -54,7 +54,12 @@ const LoginView = ({ onLogin, onRegisterClick }) => {
                     onLogin(userData);
                 }
             } else {
-                setError(data.detail || "Invalid email or password.");
+                // Check for specific error codes
+                if (response.status === 403) {
+                    setError(data.detail || "Please verify your email before logging in.");
+                } else {
+                    setError(data.detail || "Invalid email or password.");
+                }
             }
 
         } catch (err) {
@@ -127,9 +132,35 @@ const LoginView = ({ onLogin, onRegisterClick }) => {
                             <Input icon={Lock} type="password" name="password" placeholder="••••••••" value={formData.password} onChange={handleChange} />
                         </div>
 
-                        <Button onClick={handleSubmit} variant="primary" className="w-full mt-4" disabled={loading}>
+                        <div className="flex justify-end">
+                            <button 
+                                onClick={onForgotPasswordClick} 
+                                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                            >
+                                Forgot Password?
+                            </button>
+                        </div>
+
+                        <Button onClick={handleSubmit} variant="primary" className="w-full mt-2" disabled={loading}>
                             {loading ? <RefreshCw className="animate-spin" /> : "Login"}
                         </Button>
+                        
+                        <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-slate-700"></div>
+                            </div>
+                            <div className="relative flex justify-center text-xs">
+                                <span className="px-2 bg-slate-950/50 text-slate-500">or</span>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            onClick={onMagicLinkClick}
+                            className="w-full py-3 px-4 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-medium text-sm flex items-center justify-center gap-2 transition-all"
+                        >
+                            <Sparkles size={16} />
+                            Sign in with Magic Link
+                        </button>
                     </div>
                 </div>
             </div>

@@ -234,7 +234,7 @@ async def signup(
         name: User's full name
         
     Returns:
-        User data and session token
+        User data with email_verified status
     """
     try:
         if len(password) < 6:
@@ -245,14 +245,23 @@ async def signup(
         if not user:
             raise HTTPException(status_code=400, detail="Email already exists or signup failed")
         
+        # Check if email confirmation is required
+        # Supabase with email confirmations enabled will NOT auto-confirm
+        session = user.get("session")
+        email_verified = False
+        if session and hasattr(session, 'user') and session.user:
+            email_verified = session.user.email_confirmed_at is not None
+        
         return {
             "success": True,
+            "email_verified": email_verified,
+            "requires_verification": not email_verified,
             "user": {
                 "uid": user["uid"],
                 "email": user["email"],
                 "name": user["name"]
             },
-            "session": user.get("session")
+            "message": "Please check your email to verify your account" if not email_verified else "Account created successfully"
         }
     
     except HTTPException:
@@ -268,7 +277,7 @@ async def login(
     password: str = Form(...)
 ):
     """
-    Login user
+    Login user - BLOCKS unverified emails
     
     Args:
         email: User email
@@ -283,17 +292,30 @@ async def login(
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
+        # Check if email is verified
+        session = user.get("session")
+        email_verified = False
+        if session and hasattr(session, 'user') and session.user:
+            email_verified = session.user.email_confirmed_at is not None
+        
+        if not email_verified:
+            raise HTTPException(
+                status_code=403, 
+                detail="Please verify your email before logging in. Check your inbox for the verification link."
+            )
+        
         # Get full user profile
         profile = UserDB.get_user(user["uid"])
         
         return {
             "success": True,
+            "email_verified": True,
             "user": {
                 "uid": user["uid"],
                 "email": user["email"],
                 "profile": profile
             },
-            "session": user.get("session")
+            "session": session
         }
     
     except HTTPException:
@@ -307,6 +329,167 @@ async def login(
 async def logout():
     """Logout user (client-side token removal)"""
     return {"success": True, "message": "Logged out successfully"}
+
+
+@app.post("/api/auth/reset-password-request")
+async def reset_password_request(
+    email: str = Form(...),
+    redirect_url: Optional[str] = Form(None)
+):
+    """
+    Request a password reset email
+    
+    Args:
+        email: User email
+        redirect_url: Optional URL to redirect to after reset (for your frontend)
+        
+    Returns:
+        Success status
+    """
+    try:
+        result = UserDB.reset_password_email(email, redirect_url)
+        
+        if result.get("success"):
+            return {"success": True, "message": "If an account exists with this email, a password reset link has been sent."}
+        else:
+            # Don't reveal if email exists or not for security
+            return {"success": True, "message": "If an account exists with this email, a password reset link has been sent."}
+    
+    except Exception as e:
+        logger.error(f"Password reset request error: {str(e)}")
+        # Still return success to not reveal email existence
+        return {"success": True, "message": "If an account exists with this email, a password reset link has been sent."}
+
+
+@app.post("/api/auth/update-password")
+async def update_password(
+    access_token: str = Form(...),
+    new_password: str = Form(...)
+):
+    """
+    Update user password using the access token from reset link
+    
+    Args:
+        access_token: The access token from the password reset email link
+        new_password: The new password (min 6 characters)
+        
+    Returns:
+        Success status
+    """
+    try:
+        if len(new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        result = UserDB.update_user_password(access_token, new_password)
+        
+        if result.get("success"):
+            return {"success": True, "message": "Password updated successfully"}
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to update password"))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update password error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update password")
+
+
+@app.post("/api/auth/magic-link")
+async def send_magic_link(
+    email: str = Form(...),
+    redirect_url: Optional[str] = Form(None)
+):
+    """
+    Send magic link for passwordless login
+    
+    Args:
+        email: User email (must be registered)
+        redirect_url: Optional redirect URL after login
+        
+    Returns:
+        Success message
+    """
+    try:
+        # Check if user exists first to prevent spam
+        existing_user = UserDB.get_user_by_email(email)
+        
+        if not existing_user:
+            # Don't reveal that user doesn't exist for security
+            # But also don't send email to non-existent users
+            logger.warning(f"Magic link requested for non-existent user: {email}")
+            return {"success": True, "message": "If an account exists, a magic link has been sent to your email."}
+        
+        result = UserDB.send_magic_link(email, redirect_url)
+        
+        return {"success": True, "message": "If an account exists, a magic link has been sent to your email."}
+    
+    except Exception as e:
+        logger.error(f"Magic link error: {str(e)}")
+        return {"success": True, "message": "If an account exists, a magic link has been sent to your email."}
+
+
+@app.post("/api/auth/resend-confirmation")
+async def resend_confirmation(
+    email: str = Form(...)
+):
+    """
+    Resend email confirmation for signup
+    
+    Args:
+        email: User email
+        
+    Returns:
+        Success message
+    """
+    try:
+        result = UserDB.resend_confirmation_email(email)
+        
+        return {"success": True, "message": "If an account exists, a confirmation email has been sent."}
+    
+    except Exception as e:
+        logger.error(f"Resend confirmation error: {str(e)}")
+        return {"success": True, "message": "If an account exists, a confirmation email has been sent."}
+
+
+@app.post("/api/auth/verify-magic-link")
+async def verify_magic_link(
+    access_token: str = Form(...),
+    refresh_token: str = Form("")
+):
+    """
+    Verify magic link token and get user session
+    
+    Args:
+        access_token: Access token from magic link
+        refresh_token: Optional refresh token
+        
+    Returns:
+        User data and session
+    """
+    try:
+        result = UserDB.verify_magic_link_token(access_token, refresh_token)
+        
+        if not result:
+            raise HTTPException(status_code=401, detail="Invalid or expired magic link")
+        
+        # Get full user profile
+        profile = UserDB.get_user(result["uid"])
+        
+        return {
+            "success": True,
+            "user": {
+                "uid": result["uid"],
+                "email": result["email"],
+                "profile": profile
+            },
+            "session": result.get("session")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verify magic link error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify magic link")
 
 
 @app.get("/api/profile/{user_id}")

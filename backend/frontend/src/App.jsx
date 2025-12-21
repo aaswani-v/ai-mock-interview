@@ -7,6 +7,10 @@ import GalaxyBackground from './components/visuals/GalaxyBackground';
 import LandingView from './views/LandingView';
 import LoginView from './views/LoginView';
 import RegisterView from './views/RegisterView';
+import ForgotPasswordView from './views/ForgotPasswordView';
+import UpdatePasswordView from './views/UpdatePasswordView';
+import EmailVerificationPendingView from './views/EmailVerificationPendingView';
+import MagicLinkRequestView from './views/MagicLinkRequestView';
 import ProfileSetupView from './views/ProfileSetupView';
 import DashboardView from './views/DashboardView';
 import DifficultySelectionView from './views/DifficultySelectionView';
@@ -39,6 +43,8 @@ const App = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState('intermediate');
   const [interviewHistory, setInterviewHistory] = useState([]);
   const [performanceData, setPerformanceData] = useState(null);
+  const [resetAccessToken, setResetAccessToken] = useState(null);
+  const [magicLinkToken, setMagicLinkToken] = useState(null);
 
   // Fetch complete user data from backend
   const fetchUserData = async (userId) => {
@@ -85,9 +91,50 @@ const App = () => {
     return null;
   };
 
+  // Check for auth tokens in URL hash on load (password reset, magic link, email confirmation)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token') || '';
+      const type = params.get('type');
+      
+      // Password recovery
+      if (accessToken && type === 'recovery') {
+        setResetAccessToken(accessToken);
+        setView('update-password');
+        window.history.replaceState(null, '', window.location.pathname);
+        setLoading(false);
+        return;
+      }
+      
+      // Magic link login
+      if (accessToken && type === 'magiclink') {
+        setMagicLinkToken({ accessToken, refreshToken });
+        // Auto-verify the magic link
+        handleMagicLinkVerify(accessToken, refreshToken);
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+      
+      // Email confirmation (signup)
+      if (accessToken && type === 'signup') {
+        // Email is now verified, redirect to login
+        window.history.replaceState(null, '', window.location.pathname);
+        setView('login');
+        setLoading(false);
+        return;
+      }
+    }
+  }, []);
+
   // Check for existing session on load
   useEffect(() => {
     const loadUserSession = async () => {
+      // Skip if we're handling password reset
+      if (resetAccessToken) return;
+      
       const savedUser = localStorage.getItem('user');
       if (savedUser) {
         try {
@@ -137,7 +184,7 @@ const App = () => {
     };
     
     loadUserSession();
-  }, []);
+  }, [resetAccessToken]);
 
   // Handlers
   const handleLogin = async (userData) => {
@@ -162,7 +209,13 @@ const App = () => {
     }
   };
   
-  const handleRegisterSuccess = async (userData) => {
+  const handleRegisterSuccess = async (userData, requiresVerification = false) => {
+    if (requiresVerification) {
+      // User needs to verify email - show verification pending view
+      setView('email-verification-pending');
+      return;
+    }
+    
     if (userData) {
       setUser(userData);
       setUserProfile({ name: userData.name, email: userData.email });
@@ -173,6 +226,49 @@ const App = () => {
       localStorage.setItem('interview_history', JSON.stringify([]));
     }
     setView('profile-setup');
+  };
+  
+  // Handle magic link verification
+  const handleMagicLinkVerify = async (accessToken, refreshToken) => {
+    try {
+      const formData = new FormData();
+      formData.append('access_token', accessToken);
+      formData.append('refresh_token', refreshToken);
+      
+      const response = await fetch(`${API_URL}/auth/verify-magic-link`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const profile = data.user.profile || {};
+        const userData = {
+          uid: data.user.uid,
+          email: data.user.email,
+          name: profile.name || '',
+          role: profile.role || '',
+          experience_years: profile.experience_years || '',
+          salary_expectation: profile.salary_expectation || '',
+          profile_completed: profile.profile_completed || !!profile.name,
+          emailVerified: true
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('session', JSON.stringify(data.session));
+        
+        await handleLogin(userData);
+      } else {
+        setView('login');
+      }
+    } catch (error) {
+      console.error('Magic link verification failed:', error);
+      setView('login');
+    } finally {
+      setMagicLinkToken(null);
+      setLoading(false);
+    }
   };
   
   const handleLogout = () => {
@@ -386,9 +482,17 @@ const App = () => {
       case 'landing':
         return <LandingView onStart={handleStart} />;
       case 'login':
-        return <LoginView onLogin={handleLogin} onRegisterClick={() => setView('register')} />;
+        return <LoginView onLogin={handleLogin} onRegisterClick={() => setView('register')} onForgotPasswordClick={() => setView('forgot-password')} onMagicLinkClick={() => setView('magic-link')} />;
       case 'register':
         return <RegisterView onRegisterSuccess={handleRegisterSuccess} onLoginClick={() => setView('login')} setPendingEmail={setPendingEmail} />;
+      case 'forgot-password':
+        return <ForgotPasswordView onBackToLogin={() => setView('login')} />;
+      case 'update-password':
+        return <UpdatePasswordView accessToken={resetAccessToken} onSuccess={() => { setResetAccessToken(null); setView('login'); }} onBackToLogin={() => { setResetAccessToken(null); setView('login'); }} />;
+      case 'email-verification-pending':
+        return <EmailVerificationPendingView email={pendingEmail} onBackToLogin={() => setView('login')} />;
+      case 'magic-link':
+        return <MagicLinkRequestView onBackToLogin={() => setView('login')} />;
       case 'profile-setup':
         return <ProfileSetupView onComplete={handleProfileSetupComplete} updateProfile={handleProfileUpdate} />;
       case 'dashboard':

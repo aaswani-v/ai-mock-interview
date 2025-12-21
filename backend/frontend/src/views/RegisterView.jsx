@@ -43,21 +43,28 @@ const RegisterView = ({ onRegisterSuccess, onLoginClick, setPendingEmail }) => {
             const data = await response.json();
             
             if (data.success) {
-                // Store user data
-                const userData = {
-                    uid: data.user.uid,
-                    email: data.user.email,
-                    name: formData.name,
-                    emailVerified: true // Supabase handles email verification differently
-                };
-                
-                localStorage.setItem('user', JSON.stringify(userData));
-                if (data.session) {
-                    localStorage.setItem('session', JSON.stringify(data.session));
+                // Check if email verification is required
+                if (data.requires_verification) {
+                    // Don't log in - redirect to verification pending view
+                    setPendingEmail(formData.email);
+                    onRegisterSuccess(null, true); // Pass flag for verification needed
+                } else {
+                    // Email already verified (unlikely with confirmations enabled)
+                    const userData = {
+                        uid: data.user.uid,
+                        email: data.user.email,
+                        name: formData.name,
+                        emailVerified: true
+                    };
+                    
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    if (data.session) {
+                        localStorage.setItem('session', JSON.stringify(data.session));
+                    }
+                    
+                    setPendingEmail(formData.email);
+                    onRegisterSuccess(userData, false);
                 }
-                
-                setPendingEmail(formData.email);
-                onRegisterSuccess(userData);
             } else {
                 setError(data.detail || "Registration failed. Please try again.");
             }

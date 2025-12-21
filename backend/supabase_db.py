@@ -142,6 +142,20 @@ class UserDB:
             return None
     
     @staticmethod
+    def get_user_by_email(email: str) -> Optional[Dict]:
+        """Check if user exists by email"""
+        try:
+            client = get_supabase()
+            response = client.table('users').select("id, email").eq('email', email).execute()
+            
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error checking user by email: {str(e)}")
+            return None
+    
+    @staticmethod
     def update_profile(uid: str, profile_data: Dict) -> bool:
         """Update user profile"""
         try:
@@ -178,6 +192,129 @@ class UserDB:
             return None
         except Exception as e:
             logger.error(f"Error verifying token: {str(e)}")
+            return None
+    
+    @staticmethod
+    def reset_password_email(email: str, redirect_url: str = None) -> Dict:
+        """Send password reset email via Supabase Auth"""
+        try:
+            client = get_supabase()
+            
+            # Supabase will send a password reset email
+            options = {}
+            if redirect_url:
+                options["redirect_to"] = redirect_url
+            
+            client.auth.reset_password_email(email, options=options)
+            logger.info(f"Password reset email sent to: {email}")
+            
+            return {"success": True, "message": "Password reset email sent"}
+        except Exception as e:
+            logger.error(f"Error sending password reset email: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    @staticmethod
+    def update_user_password(access_token: str, new_password: str) -> Dict:
+        """Update user password using access token from reset link"""
+        try:
+            client = get_supabase()
+            
+            # Set the session using the access token
+            client.auth.set_session(access_token, "")
+            
+            # Update the user's password
+            response = client.auth.update_user({"password": new_password})
+            
+            if response.user:
+                logger.info(f"Password updated for user: {response.user.email}")
+                return {"success": True, "message": "Password updated successfully"}
+            
+            return {"success": False, "error": "Failed to update password"}
+        except Exception as e:
+            logger.error(f"Error updating password: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    @staticmethod
+    def send_magic_link(email: str, redirect_url: str = None) -> Dict:
+        """Send magic link for passwordless login"""
+        try:
+            client = get_supabase()
+            
+            options = {}
+            if redirect_url:
+                options["redirect_to"] = redirect_url
+            
+            client.auth.sign_in_with_otp({
+                "email": email,
+                "options": options
+            })
+            logger.info(f"Magic link sent to: {email}")
+            
+            return {"success": True, "message": "Magic link sent to your email"}
+        except Exception as e:
+            logger.error(f"Error sending magic link: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    @staticmethod
+    def resend_confirmation_email(email: str) -> Dict:
+        """Resend email confirmation for signup"""
+        try:
+            client = get_supabase()
+            
+            # Use resend method for confirmation
+            client.auth.resend({
+                "type": "signup",
+                "email": email
+            })
+            logger.info(f"Confirmation email resent to: {email}")
+            
+            return {"success": True, "message": "Confirmation email sent"}
+        except Exception as e:
+            logger.error(f"Error resending confirmation: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    @staticmethod
+    def change_user_email(access_token: str, new_email: str) -> Dict:
+        """Change user email - requires re-verification"""
+        try:
+            client = get_supabase()
+            
+            # Set session with current token
+            client.auth.set_session(access_token, "")
+            
+            # Update email - Supabase will send verification to new email
+            response = client.auth.update_user({"email": new_email})
+            
+            if response.user:
+                logger.info(f"Email change requested for user, new email: {new_email}")
+                return {"success": True, "message": "Verification email sent to new address"}
+            
+            return {"success": False, "error": "Failed to change email"}
+        except Exception as e:
+            logger.error(f"Error changing email: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    @staticmethod
+    def verify_magic_link_token(access_token: str, refresh_token: str = "") -> Optional[Dict]:
+        """Verify magic link token and get user session"""
+        try:
+            client = get_supabase()
+            
+            # Set session from magic link tokens
+            session = client.auth.set_session(access_token, refresh_token)
+            
+            if session and session.user:
+                user = session.user
+                logger.info(f"Magic link verified for: {user.email}")
+                return {
+                    "uid": user.id,
+                    "email": user.email,
+                    "email_confirmed": user.email_confirmed_at is not None,
+                    "session": session
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error verifying magic link: {str(e)}")
             return None
 
 # Resume operations
