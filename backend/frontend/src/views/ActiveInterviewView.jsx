@@ -175,7 +175,6 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState(false);
-    const [showTranscript, setShowTranscript] = useState(false);
     
     const timerRef = useRef(null);
     const meetingTimerRef = useRef(null);
@@ -370,102 +369,84 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                 </div>
             </header>
 
-            {/* Main Content - AI Interviewer Background + Overlay Chat */}
-            <div className="flex-1 relative overflow-hidden">
-                {/* AI Interviewer - Main Background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#1a2332] to-[#0e1621] flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full bg-gradient-to-br from-[#0e72ed] to-[#0952b5] flex items-center justify-center mb-3 shadow-2xl ring-4 ring-white/10">
-                            <span className="text-3xl sm:text-4xl font-bold text-white">AI</span>
+            {/* Main Content - Chat Log as Primary View */}
+            <div className="flex-1 relative overflow-hidden flex flex-col bg-[#0e1621]">
+                
+                {/* Chat Container - Full Space */}
+                <div 
+                    ref={chatContainerRef} 
+                    className="flex-1 overflow-y-auto p-4 space-y-4 pb-24" // Added padding-bottom for overlay
+                >
+                    {messages.map((msg, idx) => (
+                        <div key={idx} className={`max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}>
+                            <div className={`rounded-2xl px-4 py-3 text-sm sm:text-base shadow-md ${
+                                msg.role === 'user' 
+                                    ? msg.type === 'skip' 
+                                        ? 'bg-gray-700/50 text-gray-400 italic border border-white/5'
+                                        : 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-white/10'
+                                    : msg.type === 'judgment'
+                                        ? 'bg-gradient-to-br from-purple-900/60 to-purple-800/60 border border-purple-500/30 text-white'
+                                        : msg.type === 'complete'
+                                            ? 'bg-green-900/40 border border-green-500/30 text-white'
+                                            : 'bg-[#1a2332] border border-white/10 text-white'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-1.5 opacity-80">
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
+                                        msg.role === 'user' ? 'bg-white/20' : msg.type === 'judgment' ? 'bg-purple-500' : 'bg-[#0e72ed]'
+                                    }`}>{msg.role === 'user' ? 'U' : 'AI'}</span>
+                                    <span className="text-xs font-medium">
+                                        {msg.role === 'user' ? profile.name : msg.type === 'judgment' ? 'Feedback' : 'Interviewer'}
+                                    </span>
+                                    {msg.score !== undefined && (
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto ${
+                                            msg.score >= 70 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                                        }`}>{msg.score}%</span>
+                                    )}
+                                </div>
+                                <p className="leading-relaxed">{msg.text}</p>
+                                {msg.feedback?.lineAnalysis?.map((item, i) => (
+                                    <div key={i} className={`flex items-start gap-1.5 mt-2 text-xs p-2 rounded bg-black/20 ${
+                                        item.type === 'good' ? 'text-green-300' : 'text-orange-300'
+                                    }`}>
+                                        {item.type === 'good' ? <CheckCircle size={12} className="mt-0.5" /> : <AlertCircle size={12} className="mt-0.5" />}
+                                        <span>{item.feedback}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <p className="text-white font-medium text-sm sm:text-base">AI Interviewer</p>
-                        <p className="text-[#8b9cb6] text-xs mt-1">
-                            {isProcessing ? '🔄 Analyzing...' : isRecording ? '🎙️ Listening...' : '✓ Ready'}
-                        </p>
-                    </div>
+                    ))}
+                    
+                    {/* Typing/Processing Indicator */}
+                    {(isProcessing || isLoadingQuestions) && (
+                        <div className="mr-auto max-w-[75%]">
+                            <div className="bg-[#1a2332] border border-white/10 rounded-2xl px-4 py-3 flex items-center gap-2 text-white/70 text-sm">
+                                <RefreshCw size={14} className="animate-spin text-[#0e72ed]" />
+                                <span>{isProcessing ? 'Analyzing response...' : 'Thinking...'}</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Spacer for bottom overlay */}
+                    <div className="h-16"></div>
                 </div>
 
-                {/* Current Question - Bottom Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
-                    <div className="flex items-start gap-2 mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0e72ed]/30 text-[#8ab4f8] whitespace-nowrap">
-                            {currentQuestion?.topic}
+                {/* Current Question - Bottom Overlay (Fixed above footer) */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0e1621] via-[#0e1621]/95 to-transparent z-10 pointer-events-none">
+                     <div className="flex items-start gap-2 mb-1 pointer-events-auto">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0e72ed]/20 text-[#8ab4f8] whitespace-nowrap border border-[#0e72ed]/20">
+                            {currentQuestion?.topic || 'Topic'}
                         </span>
                     </div>
-                    <p className="text-white text-sm sm:text-base font-medium leading-snug">
+                    <p className="text-white text-lg font-medium leading-snug drop-shadow-md pointer-events-auto">
                         {currentQuestion?.question}
                     </p>
                 </div>
-
-                {/* Transcript Toggle Button */}
-                <button 
-                    onClick={() => setShowTranscript(!showTranscript)}
-                    className="absolute top-3 right-3 px-2 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs flex items-center gap-1 z-20"
-                >
-                    {showTranscript ? 'Hide' : 'Show'} Log
-                    <ChevronRight size={12} className={`transition-transform ${showTranscript ? 'rotate-180' : ''}`} />
-                </button>
-
-                {/* Transcript Panel - Slide from Right */}
-                {showTranscript && (
-                    <div className="absolute top-0 right-0 bottom-0 w-72 sm:w-80 bg-[#0e1621]/95 backdrop-blur-md border-l border-white/10 z-10 flex flex-col">
-                        <div className="p-2 border-b border-white/10">
-                            <span className="text-white text-xs font-medium">Conversation Log</span>
-                        </div>
-                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 space-y-2">
-                            {messages.map((msg, idx) => (
-                                <div key={idx} className={`${msg.role === 'user' ? 'ml-4' : 'mr-4'}`}>
-                                    <div className={`rounded-lg px-2.5 py-2 text-xs ${
-                                        msg.role === 'user' 
-                                            ? msg.type === 'skip' 
-                                                ? 'bg-gray-600/30 text-gray-400 italic'
-                                                : 'bg-green-600/20 border border-green-600/30 text-white'
-                                            : msg.type === 'judgment'
-                                                ? 'bg-purple-600/20 border border-purple-500/30 text-white'
-                                                : msg.type === 'complete'
-                                                    ? 'bg-green-600/20 border border-green-500/30 text-white'
-                                                    : 'bg-[#0e72ed]/20 border border-[#0e72ed]/30 text-white'
-                                    }`}>
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
-                                                msg.role === 'user' ? 'bg-green-600' : msg.type === 'judgment' ? 'bg-purple-600' : 'bg-[#0e72ed]'
-                                            }`}>{msg.role === 'user' ? 'U' : 'AI'}</span>
-                                            <span className="text-[10px] text-white/60">
-                                                {msg.role === 'user' ? profile.name : msg.type === 'judgment' ? 'Feedback' : 'Interviewer'}
-                                            </span>
-                                            {msg.score !== undefined && (
-                                                <span className={`text-[10px] font-bold px-1 rounded ${
-                                                    msg.score >= 70 ? 'bg-green-500/30 text-green-400' : 'bg-yellow-500/30 text-yellow-400'
-                                                }`}>{msg.score}%</span>
-                                            )}
-                                        </div>
-                                        <p className="leading-relaxed">{msg.text}</p>
-                                        {msg.feedback?.lineAnalysis?.map((item, i) => (
-                                            <div key={i} className={`flex items-center gap-1 mt-1 text-[10px] ${
-                                                item.type === 'good' ? 'text-green-400' : 'text-orange-400'
-                                            }`}>
-                                                {item.type === 'good' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
-                                                <span>{item.feedback}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                            {isProcessing && (
-                                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[#1a2332] rounded-lg">
-                                    <RefreshCw size={10} className="animate-spin text-[#0e72ed]" />
-                                    <span className="text-[10px] text-[#8b9cb6]">Analyzing...</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
+                
                 {/* Recording Indicator Overlay */}
                 {isRecording && (
-                    <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 z-20">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-red-400 text-xs font-medium">Recording</span>
+                    <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 backdrop-blur-md z-20 shadow-lg animate-pulse">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span className="text-red-100 text-xs font-bold tracking-wide">RECORDING</span>
                         <AudioVisualizer isActive={true} />
                     </div>
                 )}
