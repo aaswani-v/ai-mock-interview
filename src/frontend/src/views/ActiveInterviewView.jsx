@@ -292,17 +292,51 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                     if (!response.ok) throw new Error("Failed");
                     const data = await response.json();
                     const transcript = data.transcript || "(No speech)";
-                    const feedback = generateLineFeedback(transcript);
                     
-                    setMessages(prev => [...prev, { role: 'user', type: 'answer', text: transcript, feedback, score: data.overallScore }]);
+                    // Add user's answer
+                    setMessages(prev => [...prev, { 
+                        role: 'user', 
+                        type: 'answer', 
+                        text: transcript, 
+                        score: data.overallScore 
+                    }]);
                     
-                    const judgmentText = data.evaluation?.reasoning || data.content?.reasoning || 
-                        `Score: ${data.overallScore || 0}/100. ${data.overallScore >= 70 ? 'Great!' : data.overallScore >= 50 ? 'Good, room for improvement.' : 'Needs practice.'}`;
-                    setMessages(prev => [...prev, { role: 'ai', type: 'judgment', text: judgmentText, score: data.overallScore }]);
+                    // Extract detailed suggestions from the API response
+                    const suggestions = data.evaluation?.suggestions || data.content?.suggestions || [];
+                    const lineAnalysis = data.lineAnalysis || [];
+                    
+                    // Build enhanced feedback message with actionable improvements
+                    const feedbackIntro = data.evaluation?.reasoning || data.content?.reasoning || 
+                        `Score: ${data.overallScore || 0}/100. ${data.overallScore >= 70 ? 'Great job!' : data.overallScore >= 50 ? 'Good effort, room for improvement.' : 'Keep practicing!'}`;
+                    
+                    // Add AI feedback with detailed suggestions
+                    setMessages(prev => [...prev, { 
+                        role: 'ai', 
+                        type: 'feedback', 
+                        text: feedbackIntro,
+                        score: data.overallScore,
+                        suggestions: suggestions,
+                        lineAnalysis: lineAnalysis
+                    }]);
 
                     setAllResults(prev => [...prev, { ...data, question: currentQuestion }]);
                     setLastResult(data);
                     setHasAnsweredCurrent(true);
+                    
+                    // Auto-advance to next question after a delay
+                    if (!isLastQuestion) {
+                        setTimeout(() => {
+                            const nextQ = questions[currentQuestionIndex + 1];
+                            setMessages(prev => [...prev, { 
+                                role: 'ai', 
+                                type: 'question', 
+                                text: nextQ.question, 
+                                topic: nextQ.topic 
+                            }]);
+                            setCurrentQuestionIndex(prev => prev + 1);
+                            setHasAnsweredCurrent(false);
+                        }, 2500);
+                    }
 
                 } catch {
                     setMessages(prev => [...prev, { role: 'ai', type: 'error', text: "Analysis failed. Try again." }]);
@@ -375,35 +409,76 @@ const ActiveInterviewView = ({ onEndQuestion, userProfile, difficulty = 'interme
                 {/* Chat Container - Full Space */}
                 <div 
                     ref={chatContainerRef} 
-                    className="flex-1 overflow-y-auto p-4 space-y-4 pb-24" // Added padding-bottom for overlay
+                    className="flex-1 overflow-y-auto p-4 space-y-4 pb-24"
                 >
                     {messages.map((msg, idx) => (
-                        <div key={idx} className={`max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}>
+                        <div key={idx} className={`max-w-[90%] sm:max-w-[80%] ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}>
                             <div className={`rounded-2xl px-4 py-3 text-sm sm:text-base shadow-md ${
                                 msg.role === 'user' 
                                     ? msg.type === 'skip' 
                                         ? 'bg-gray-700/50 text-gray-400 italic border border-white/5'
                                         : 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-white/10'
-                                    : msg.type === 'judgment'
-                                        ? 'bg-gradient-to-br from-purple-900/60 to-purple-800/60 border border-purple-500/30 text-white'
+                                    : msg.type === 'feedback'
+                                        ? 'bg-gradient-to-br from-purple-900/60 to-purple-800/40 border border-purple-500/30 text-white'
                                         : msg.type === 'complete'
                                             ? 'bg-green-900/40 border border-green-500/30 text-white'
                                             : 'bg-[#1a2332] border border-white/10 text-white'
                             }`}>
+                                {/* Message Header */}
                                 <div className="flex items-center gap-2 mb-1.5 opacity-80">
                                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
-                                        msg.role === 'user' ? 'bg-white/20' : msg.type === 'judgment' ? 'bg-purple-500' : 'bg-[#0e72ed]'
+                                        msg.role === 'user' ? 'bg-white/20' : msg.type === 'feedback' ? 'bg-purple-500' : 'bg-[#0e72ed]'
                                     }`}>{msg.role === 'user' ? 'U' : 'AI'}</span>
                                     <span className="text-xs font-medium">
-                                        {msg.role === 'user' ? profile.name : msg.type === 'judgment' ? 'Feedback' : 'Interviewer'}
+                                        {msg.role === 'user' ? profile.name : msg.type === 'feedback' ? 'Coach Feedback' : 'Interviewer'}
                                     </span>
                                     {msg.score !== undefined && (
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto ${
-                                            msg.score >= 70 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                                            msg.score >= 70 ? 'bg-green-500/20 text-green-400' : msg.score >= 50 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
                                         }`}>{msg.score}%</span>
                                     )}
                                 </div>
+                                
+                                {/* Main Text */}
                                 <p className="leading-relaxed">{msg.text}</p>
+                                
+                                {/* Enhanced Suggestions for Feedback Type */}
+                                {msg.type === 'feedback' && msg.suggestions && msg.suggestions.length > 0 && (
+                                    <div className="mt-4 space-y-3">
+                                        <div className="text-xs font-semibold text-purple-300 uppercase tracking-wide flex items-center gap-1">
+                                            <span>💡</span> How to Improve
+                                        </div>
+                                        {msg.suggestions.slice(0, 3).map((suggestion, i) => (
+                                            <div key={i} className="bg-black/30 rounded-xl p-3 border border-purple-500/20">
+                                                {/* What could be improved */}
+                                                <div className="flex items-start gap-2 mb-2">
+                                                    <AlertCircle size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                                                    <span className="text-orange-200 text-sm font-medium">
+                                                        {suggestion.improvement || suggestion}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* Context - What was said */}
+                                                {suggestion.context && suggestion.context !== 'General' && (
+                                                    <div className="ml-5 mb-2 pl-3 border-l-2 border-red-500/40">
+                                                        <span className="text-xs text-gray-400">What you said:</span>
+                                                        <p className="text-red-300/80 text-sm italic">"{suggestion.context}"</p>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Better approach */}
+                                                {suggestion.better_approach && (
+                                                    <div className="ml-5 pl-3 border-l-2 border-green-500/40">
+                                                        <span className="text-xs text-gray-400">Try instead:</span>
+                                                        <p className="text-green-300 text-sm">"{suggestion.better_approach}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {/* Line Analysis for user answers (legacy support) */}
                                 {msg.feedback?.lineAnalysis?.map((item, i) => (
                                     <div key={i} className={`flex items-start gap-1.5 mt-2 text-xs p-2 rounded bg-black/20 ${
                                         item.type === 'good' ? 'text-green-300' : 'text-orange-300'
