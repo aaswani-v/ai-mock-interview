@@ -43,6 +43,9 @@ from supabase_db import initialize_supabase, UserDB, ResumeDB, InterviewDB
 from services.resume_parser import resume_parser
 from services.ats_scorer import ats_scorer
 
+# Import job roles
+from job_roles import get_all_job_roles, get_job_role, calculate_compatibility
+
 # Load questions database
 QUESTIONS = {}
 questions_path = Path(__file__).parent / "questions.json"
@@ -545,8 +548,51 @@ async def update_profile(
 
 
 # ============================================================================
+# JOB ROLES ENDPOINTS
+# ============================================================================
+
+@app.get("/api/jobs/roles")
+async def get_roles():
+    """Get all available job roles for resume matching"""
+    try:
+        roles = get_all_job_roles()
+        # Transform to list format for frontend
+        roles_list = [
+            {
+                "id": role_id,
+                "title": role_data.get("title"),
+                "description": role_data.get("description"),
+                "requiredSkills": role_data.get("requiredSkills", []),
+                "preferredSkills": role_data.get("preferredSkills", []),
+                "experienceLevels": role_data.get("experienceLevels", {})
+            }
+            for role_id, role_data in roles.items()
+        ]
+        return {"success": True, "roles": roles_list}
+    except Exception as e:
+        logger.error(f"Error fetching job roles: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch job roles")
+
+
+@app.get("/api/jobs/roles/{role_id}")
+async def get_role_by_id(role_id: str):
+    """Get a specific job role by ID"""
+    try:
+        role = get_job_role(role_id)
+        if not role:
+            raise HTTPException(status_code=404, detail=f"Role '{role_id}' not found")
+        return {"success": True, "role": {"id": role_id, **role}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching job role {role_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch job role")
+
+
+# ============================================================================
 # RESUME ENDPOINTS
 # ============================================================================
+
 
 @app.post("/api/resume/upload")
 async def upload_resume(
