@@ -96,3 +96,284 @@
 .clip-path-hexagon {
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
+
+/* Resume Scanner Animations */
+@keyframes scan {
+    0% {
+        top: 0;
+    }
+
+    100% {
+        top: 100%;
+    }
+}
+
+@keyframes scan-overlay {
+    0% {
+        opacity: 0.3;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+
+    100% {
+        opacity: 0.3;
+    }
+}
+
+@keyframes pop-in {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    70% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-scan {
+    animation: scan 2s ease-in-out infinite;
+}
+
+.animate-scan-overlay {
+    animation: scan-overlay 2s ease-in-out infinite;
+}
+
+.animate-pop-in {
+    animation: pop-in 0.5s ease-out 2.5s forwards;
+}
+
+/* Fire/Flame Animations */
+@keyframes flame-flicker {
+
+    0%,
+    100% {
+        transform: scaleY(1) scaleX(1) translateY(0);
+        filter: brightness(1);
+    }
+
+    25% {
+        transform: scaleY(1.05) scaleX(0.95) translateY(-2px);
+        filter: brightness(1.1);
+    }
+
+    50% {
+        transform: scaleY(0.95) scaleX(1.05) translateY(1px);
+        filter: brightness(0.95);
+    }
+
+    75% {
+        transform: scaleY(1.08) scaleX(0.92) translateY(-3px);
+        filter: brightness(1.05);
+    }
+}
+
+@keyframes flame-wave {
+
+    0%,
+    100% {
+        transform: rotate(-2deg) scaleY(1);
+    }
+
+    50% {
+        transform: rotate(2deg) scaleY(1.1);
+    }
+}
+
+@keyframes ember-rise {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-40px) scale(0.3);
+    }
+}
+
+@keyframes glow-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(251, 146, 60, 0.6),
+            0 0 40px rgba(251, 146, 60, 0.4),
+            0 0 60px rgba(251, 146, 60, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(251, 146, 60, 0.8),
+            0 0 50px rgba(251, 146, 60, 0.5),
+            0 0 80px rgba(251, 146, 60, 0.3);
+    }
+}
+
+.animate-flame-flicker {
+    animation: flame-flicker 0.5s ease-in-out infinite;
+}
+
+.animate-flame-wave {
+    animation: flame-wave 1s ease-in-out infinite;
+}
+
+.animate-ember-rise {
+    animation: ember-rise 1.5s ease-out forwards;
+}
+
+.animate-glow-pulse {
+    animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Typewriter Animation */
+@keyframes typing {
+    from {
+        width: 0;
+    }
+
+    to {
+        width: 100%;
+    }
+}
+
+@keyframes blink-caret {
+
+    from,
+    to {
+        border-color: transparent;
+    }
+
+    50% {
+        border-color: #06b6d4;
+    }
+}
+
+/* Checklist check animation */
+@keyframes check-bounce {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.3);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-check-bounce {
+    animation: check-bounce 0.4s ease-out forwards;
+}
+
+/* Eye blink animation */
+@keyframes blink {
+
+    0%,
+    90%,
+    100% {
+        opacity: 1;
+    }
+
+    95% {
+        opacity: 0;
+    }
+}
+
+.animate-blink {
+    animation: blink 3s ease-in-out infinite;
+}
+
+/* Draw path animation for graphs */
+@keyframes drawPath {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+.animate-draw-path {
+    stroke-dasharray: 500;
+    stroke-dashoffset: 500;
+    animation: drawPath 2s ease-out forwards;
+}
+
+/* Fade in delayed animation */
+@keyframes fadeInDelayed {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in-delayed {
+    animation: fadeInDelayed 0.8s ease-out 0.8s forwards;
+}
+
+/* Slow ping animation */
+@keyframes pingSlow {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+
+    75%,
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+.animate-ping-slow {
+    animation: pingSlow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Pulse slow animation */
+@keyframes pulseSlow {
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+.animate-pulse-slow {
+    animation: pulseSlow 3s ease-in-out infinite;
+}
+
+/* Gradient background animation */
+@keyframes gradientX {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.animate-gradient-x {
+    animation: gradientX 3s ease infinite;
+}
+
+/* Radial gradient utility */
+.bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-from, transparent) 0%, var(--tw-gradient-to, transparent) 100%);
+}
