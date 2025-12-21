@@ -22,7 +22,7 @@ dist/
 
 # Firebase credentials (NEVER commit!)
 firebase-credentials.json
-*.json
+# Note: Removed *.json to allow package.json files for frontend
 
 # Test files and samples
 samples/*.mp4
