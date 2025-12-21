@@ -7,7 +7,7 @@ Username: test@test.com
 Password: test@1
 
 Walkthrough Video Link: 
-https://drive.google.com/drive/folders/1ho9RYie1kd-1j7gelGx7vlTmeakgrBGg?usp=sharing
+https://drive.google.com/file/d/1RjlAqQqlx59Vvt5cjI0o8RGUw4Y-1GcA/view?usp=drive_link
 
 Due to this website can delay the output, login or account creation.
 
