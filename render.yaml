@@ -1,4 +1,4 @@
-# Render Blueprint - Deploy Backend Service
+# Render Blueprint - Deploy Backend and Frontend Services
 # Docs: https://docs.render.com/blueprint-spec
 
 services:
@@ -16,7 +16,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.0"
       - key: GROQ_API_KEY
-        sync: false # Set manually in Render Dashboard
+        sync: false
       - key: DEEPGRAM_API_KEY
         sync: false
       - key: SUPABASE_URL
@@ -25,7 +25,7 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         value: "*"
-    rootDir: backend
+    rootDir: src/backend
 
   # ============================================
   # FRONTEND - React/Vite Static Site
@@ -37,7 +37,7 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    rootDir: backend/frontend
+    rootDir: src/frontend
     envVars:
       - key: NODE_VERSION
         value: "20"
